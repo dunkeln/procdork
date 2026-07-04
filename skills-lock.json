@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "skills": {
+    "isotope": {
+      "source": "dunkeln/isotope",
+      "sourceType": "github",
+      "skillPath": "skills/isotope/SKILL.md",
+      "computedHash": "6c0778dcc42822bc7105405d8e6706dc15273fe0db8696e8e33650afb218c665"
+    },
+    "isotope-audit": {
+      "source": "dunkeln/isotope",
+      "sourceType": "github",
+      "skillPath": "skills/isotope-audit/SKILL.md",
+      "computedHash": "a460ad169a0bba4fe2a5322533014ad812ba63d0761d9044f1aa21dae5d4cb96"
+    },
+    "isotope-debt": {
+      "source": "dunkeln/isotope",
+      "sourceType": "github",
+      "skillPath": "skills/isotope-debt/SKILL.md",
+      "computedHash": "f10179bbfdcf68efcff40815938c5b4afbf9a05fdfb105f6a67a7d610ae472b0"
+    },
+    "liteparse": {
+      "source": "run-llama/llamaparse-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/liteparse/SKILL.md",
+      "computedHash": "7f91112b713a4a7e6f2e30de05fa5ee16ae437d657487490e1767a2072626060"
+    },
+    "llamacloud-index": {
+      "source": "run-llama/llamaparse-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llamacloud-index/SKILL.md",
+      "computedHash": "9a36c49cf5c4db16ab23b281d5b29dfb5874594725d72faa51e157a87c04b9fe"
+    },
+    "llamaparse": {
+      "source": "run-llama/llamaparse-agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/llamaparse/SKILL.md",
+      "computedHash": "43e155be048b413a47c4f9966da586c2c1ef09b068146dc5dd0ccda966410ca4"
+    },
+    "postmortem": {
+      "source": "dunkeln/skills",
+      "sourceType": "github",
+      "skillPath": "skills/postmortem/SKILL.md",
+      "computedHash": "6e06e2db14f489ac59787dac287ed68c66a52944333501fb27190623d33c917e"
+    },
+    "premortem": {
+      "source": "dunkeln/skills",
+      "sourceType": "github",
+      "skillPath": "skills/premortem/SKILL.md",
+      "computedHash": "becaaf4386a2e2398aaf9cf6df352693ce0e2e08389bfa000cc3a61986922dd7"
+    }
+  }
+}

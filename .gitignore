@@ -1,0 +1,32 @@
+# Local notes
+pitch.md
+
+# Environment
+.env
+.env.*
+!.env.example
+.agents/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# JavaScript/Svelte
+node_modules/
+.svelte-kit/
+build/
+dist/
+
+# Logs and OS/editor noise
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# Non-spotlight app prototypes
+backend/
+web/

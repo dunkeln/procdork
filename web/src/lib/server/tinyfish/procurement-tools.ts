@@ -1,12 +1,14 @@
 import { getTinyFishClient } from '$lib/server/tinyfish/client';
+import { createIngestionJob, normalizeIngestionSource } from '$lib/server/ingestion/client';
 import { FetchFormat } from '@tiny-fish/sdk';
 import type {
 	ToolResultBlockParam,
 	ToolUnion,
 	ToolUseBlock
 } from '@anthropic-ai/sdk/resources/messages';
+import type { DocumentIngestionRequest } from '$lib/contracts/supplier-entity';
 
-type DocumentType = 'coa' | 'sds' | 'spec-sheet' | 'certificate' | 'price-list' | 'other';
+type DocumentType = 'coa' | 'sds' | 'spec-sheet' | 'certificate' | 'price-list' | 'quote' | 'other';
 
 export type Evidence = {
 	title: string;
@@ -28,6 +30,11 @@ type DocumentLink = {
 	retrieved_at: string;
 	confidence: 'high' | 'medium' | 'low';
 	reason: string;
+};
+
+type ToolContext = {
+	sessionId: string;
+	turnId?: string;
 };
 
 export const procurementTools: ToolUnion[] = [
@@ -58,11 +65,46 @@ export const procurementTools: ToolUnion[] = [
 			},
 			required: ['urls']
 		}
+	},
+	{
+		name: 'ingest_documents',
+		description:
+			'Parse document pointers already discovered by web search/fetch when the user needs document-backed supplier facts such as MOQ, lead time, grade, COA/SDS/spec/certificate details, or conflicts. Call this after search/fetch returns relevant document_links for those facts. If documents are omitted, ingest currently discovered document evidence.',
+		input_schema: {
+			type: 'object',
+			properties: {
+				documents: {
+					type: 'array',
+					items: {
+						type: 'object',
+						properties: {
+							url: { type: 'string', description: 'Absolute public document URL.' },
+							title: { type: 'string', description: 'Document title or link text.' },
+							document_type: {
+								type: 'string',
+								description:
+									'Best known document kind: coa, sds, spec-sheet, certificate, price-list, quote, or other.'
+							},
+							mime_hint: { type: 'string', description: 'MIME hint such as application/pdf.' },
+							retrieved_at: { type: 'string', description: 'ISO retrieval timestamp if known.' },
+							reason: {
+								type: 'string',
+								description: 'Why this document is relevant to the procurement question.'
+							}
+						},
+						required: ['url']
+					},
+					description: 'Document pointers to ingest. Up to 5 URLs.'
+				}
+			}
+		}
 	}
 ];
 
 export function toolLabel(name: string) {
-	return name === 'tinyfish_fetch' ? 'web fetch' : 'web search';
+	if (name === 'tinyfish_fetch') return 'web fetch';
+	if (name === 'ingest_documents') return 'document ingest';
+	return 'web search';
 }
 
 export function citationsFrom(evidence: Evidence[]): ChatCitation[] {
@@ -143,7 +185,11 @@ function linksFrom(value: unknown) {
 		: [];
 }
 
-export async function runProcurementTool(toolUse: ToolUseBlock, evidence: Evidence[]) {
+export async function runProcurementTool(
+	toolUse: ToolUseBlock,
+	evidence: Evidence[],
+	context: ToolContext
+) {
 	try {
 		if (toolUse.name === 'tinyfish_search') {
 			const query =
@@ -247,6 +293,56 @@ export async function runProcurementTool(toolUse: ToolUseBlock, evidence: Eviden
 			return jsonToolResult(toolUse, { results, document_links, errors: data.errors });
 		}
 
+		if (toolUse.name === 'ingest_documents') {
+			const explicitDocuments =
+				typeof toolUse.input === 'object' &&
+				toolUse.input &&
+				'documents' in toolUse.input &&
+				Array.isArray(toolUse.input.documents)
+					? toolUse.input.documents
+					: [];
+			const fallbackDocuments = evidence
+				.filter((item) => item.source === 'document')
+				.map((item) => ({
+					url: item.url,
+					title: item.title,
+					document_type: item.document_type,
+					mime_hint: item.mime_hint,
+					retrieved_at: item.retrieved_at,
+					reason: item.snippet
+				}));
+			const sources = dedupeSources(
+				(explicitDocuments.length ? explicitDocuments : fallbackDocuments)
+					.map((document) =>
+						typeof document === 'object' && document !== null
+							? normalizeIngestionSource(document)
+							: undefined
+					)
+					.filter((source): source is DocumentIngestionRequest => Boolean(source))
+			).slice(0, 5);
+
+			if (!sources.length) {
+				return jsonToolResult(
+					toolUse,
+					{ error: 'No document pointers are available to ingest.' },
+					true
+				);
+			}
+
+			const job = await createIngestionJob({
+				sessionId: context.sessionId,
+				turnId: context.turnId,
+				sources
+			});
+
+			return jsonToolResult(toolUse, {
+				job_id: job.job_id,
+				status: job.status,
+				result: job.result,
+				error: job.error
+			});
+		}
+
 		return jsonToolResult(toolUse, { error: `Unknown tool: ${toolUse.name}` }, true);
 	} catch (error) {
 		return jsonToolResult(
@@ -255,4 +351,15 @@ export async function runProcurementTool(toolUse: ToolUseBlock, evidence: Eviden
 			true
 		);
 	}
+}
+
+function dedupeSources(sources: DocumentIngestionRequest[]) {
+	const seen = new Set<string>();
+
+	return sources.filter((source) => {
+		const key = source.url ?? source.source_id;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
 }

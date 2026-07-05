@@ -36,11 +36,21 @@
 		);
 	}
 
+	function appendProgress(id: string, text: string) {
+		messages = messages.map((message) =>
+			message.id === id ? { ...message, progress: `${message.progress ?? ''}${text}` } : message
+		);
+	}
+
 	function handleStreamEvent(event: unknown, assistantId: string) {
 		if (typeof event !== 'object' || event === null || !('type' in event)) return;
 
 		if (event.type === 'delta' && 'text' in event && typeof event.text === 'string') {
-			appendToMessage(assistantId, event.text);
+			if ('channel' in event && event.channel === 'progress') {
+				appendProgress(assistantId, event.text);
+			} else {
+				appendToMessage(assistantId, event.text);
+			}
 		}
 
 		if (event.type === 'evidence' && 'evidence' in event && Array.isArray(event.evidence)) {
@@ -54,6 +64,7 @@
 			Array.isArray(event.citations)
 		) {
 			updateMessage(assistantId, {
+				...('prose' in event && typeof event.prose === 'string' ? { content: event.prose } : {}),
 				evidence: event.citations as EvidenceItem[],
 				suggestEmail: event.suggestEmail === true,
 				suggestEmailLabel:
@@ -89,6 +100,13 @@
 
 		const userId = crypto.randomUUID();
 		const assistantId = crypto.randomUUID();
+		const history = messages
+			.slice()
+			.reverse()
+			.filter((item) => item.content.trim())
+			.slice(-6)
+			.map((item) => ({ role: item.role, content: item.content }));
+		const sessionId = location.pathname.split('/').filter(Boolean).pop() ?? 'ephemeral';
 
 		loading = true;
 		error = '';
@@ -113,7 +131,7 @@
 			const response = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ message })
+				body: JSON.stringify({ message, history, sessionId })
 			});
 
 			if (!response.ok) {

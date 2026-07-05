@@ -13,6 +13,7 @@
 		id: string;
 		role: 'user' | 'assistant';
 		content: string;
+		progress?: string;
 		originalRequest?: string;
 		loading?: boolean;
 		evidence?: EvidenceItem[];
@@ -106,6 +107,13 @@
 								working
 							</Badge>
 						{/if}
+						{#if message.progress}
+							<div
+								class="mb-3 max-w-[72ch] border-l border-[#10120f]/10 pl-3 font-mono text-xs leading-5 whitespace-pre-wrap text-[#596154]/70"
+							>
+								{message.progress}
+							</div>
+						{/if}
 						<div
 							class="prose prose-sm max-w-none prose-headings:mt-0 prose-headings:text-[#10120f] prose-p:leading-6 prose-a:text-[#10120f] prose-strong:text-[#10120f] text-[#10120f]"
 						>
@@ -122,6 +130,7 @@
 								</summary>
 								<div class="mt-2 space-y-1 border-l border-[#10120f]/5 pl-3">
 									{#each message.evidence as item, index (item.url)}
+										<!-- eslint-disable svelte/no-navigation-without-resolve -->
 										<a
 											href={item.url}
 											class="block py-0.5 text-[#596154]/70 decoration-[#aeb7aa]/50 underline-offset-4 hover:text-[#10120f] hover:underline"
@@ -130,6 +139,7 @@
 										>
 											{evidenceLabel(item, index)}
 										</a>
+										<!-- eslint-enable svelte/no-navigation-without-resolve -->
 									{/each}
 								</div>
 							</details>

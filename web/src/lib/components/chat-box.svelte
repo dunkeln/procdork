@@ -3,15 +3,23 @@
 		title: string;
 		url: string;
 		snippet?: string;
-		source: 'search' | 'fetch';
+		source: 'search' | 'fetch' | 'document';
 	};
 
 	export type ChatMessage = {
 		id: string;
 		role: 'user' | 'assistant';
 		content: string;
+		originalRequest?: string;
 		loading?: boolean;
 		evidence?: EvidenceItem[];
+		suggestEmail?: boolean;
+		suggestEmailLabel?: string;
+		emailLoading?: boolean;
+		emailDraft?: {
+			subject: string;
+			body: string;
+		};
 		tool?: {
 			label: string;
 			status: 'running' | 'done' | 'error';
@@ -21,10 +29,15 @@
 
 <script lang="ts">
 	import { Badge } from '$lib/components/ui/badge';
-	import { LoaderCircle } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button';
+	import EmailDraft from '$lib/components/email-draft.svelte';
+	import { LoaderCircle, Mail } from '@lucide/svelte';
 	import MarkdownIt from 'markdown-it';
 
-	let { messages }: { messages: ChatMessage[] } = $props();
+	let {
+		messages,
+		onDraftEmail
+	}: { messages: ChatMessage[]; onDraftEmail: (message: ChatMessage) => void } = $props();
 
 	const markdown = new MarkdownIt({
 		html: false,
@@ -87,6 +100,26 @@
 									</a>
 								{/each}
 							</div>
+						{/if}
+						{#if message.suggestEmail && !message.emailDraft}
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={message.emailLoading}
+								class="mt-3 border-[#10120f] bg-[#10120f] text-xs text-white hover:bg-[#10120f]/90"
+								onclick={() => onDraftEmail(message)}
+							>
+								{#if message.emailLoading}
+									<LoaderCircle class="animate-spin" />
+								{:else}
+									<Mail />
+								{/if}
+								{message.suggestEmailLabel ?? 'Suggest email'}
+							</Button>
+						{/if}
+						{#if message.emailDraft}
+							<EmailDraft draft={message.emailDraft} />
 						{/if}
 					</div>
 				{/if}

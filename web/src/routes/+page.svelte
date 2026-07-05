@@ -48,6 +48,22 @@
 		}
 
 		if (
+			event.type === 'final' &&
+			'citations' in event &&
+			'suggestEmail' in event &&
+			Array.isArray(event.citations)
+		) {
+			updateMessage(assistantId, {
+				evidence: event.citations as EvidenceItem[],
+				suggestEmail: event.suggestEmail === true,
+				suggestEmailLabel:
+					'suggestEmailLabel' in event && typeof event.suggestEmailLabel === 'string'
+						? event.suggestEmailLabel
+						: undefined
+			});
+		}
+
+		if (
 			event.type === 'tool' &&
 			'label' in event &&
 			'status' in event &&
@@ -79,7 +95,14 @@
 		hasSearched = true;
 		messages = [
 			{ id: userId, role: 'user', content: message },
-			{ id: assistantId, role: 'assistant', content: '', loading: true, evidence: [] },
+			{
+				id: assistantId,
+				role: 'assistant',
+				content: '',
+				originalRequest: message,
+				loading: true,
+				evidence: []
+			},
 			...messages
 		];
 		query = '';
@@ -133,6 +156,40 @@
 			});
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function draftEmail(message: ChatMessage) {
+		if (message.emailLoading || message.emailDraft) return;
+
+		updateMessage(message.id, { emailLoading: true });
+
+		try {
+			const response = await fetch('/api/chat/email', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					message: message.originalRequest ?? message.content,
+					prose: message.content,
+					citations: message.evidence ?? []
+				})
+			});
+			const data = await response.json().catch(() => null);
+
+			if (!response.ok) throw new Error(data?.error ?? 'Email draft failed.');
+
+			updateMessage(message.id, {
+				emailDraft: {
+					subject: data.subject ?? 'Supplier quote request',
+					body: data.body ?? ''
+				},
+				emailLoading: false
+			});
+		} catch (caught) {
+			updateMessage(message.id, { emailLoading: false });
+			toast.error('Email draft failed', {
+				description: caught instanceof Error ? caught.message : 'The runtime did not return a draft.'
+			});
 		}
 	}
 </script>
@@ -218,7 +275,7 @@
 						<p class="mt-3 shrink-0 text-sm text-[#9a321d]">{error}</p>
 					{/if}
 					{#if messages.length}
-						<ChatBox {messages} />
+						<ChatBox {messages} onDraftEmail={draftEmail} />
 					{/if}
 				</div>
 			</section>

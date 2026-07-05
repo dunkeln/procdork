@@ -26,7 +26,3 @@ dist/
 .DS_Store
 .idea/
 .vscode/
-
-# Non-spotlight app prototypes
-backend/
-web/

@@ -4,6 +4,9 @@
 		url: string;
 		snippet?: string;
 		source: 'search' | 'fetch' | 'document';
+		retrieved_at?: string;
+		document_type?: string;
+		mime_hint?: string;
 	};
 
 	export type ChatMessage = {
@@ -48,10 +51,30 @@
 	function renderMarkdown(content: string) {
 		return markdown.render(content || '');
 	}
+
+	function evidenceLabel(item: EvidenceItem, index: number) {
+		const prefix = `[${index + 1}]`;
+		if (item.source === 'document' && item.document_type) {
+			return `${prefix} ${item.document_type} · ${item.title}`;
+		}
+		return `${prefix} ${item.title}`;
+	}
+
+	let chatHistory: HTMLElement;
+	let currentHeadId = $state('');
+
+	$effect(() => {
+		const nextHeadId = messages[0]?.id ?? '';
+		if (!chatHistory || nextHeadId === currentHeadId) return;
+
+		currentHeadId = nextHeadId;
+		chatHistory.scrollTop = 0;
+	});
 </script>
 
 <section
-	class="mt-5 min-h-0 w-full max-w-2xl flex-1 overflow-y-auto border-t border-[#dfe5dc] pt-5"
+	bind:this={chatHistory}
+	class="mt-5 min-h-0 w-full flex-1 overflow-y-auto border-t border-[#dfe5dc] pt-5"
 	aria-label="Chat history"
 >
 	<div class="space-y-4">
@@ -71,35 +94,45 @@
 				{:else}
 					<div class="max-w-[88%]">
 						{#if message.tool}
-							<Badge
-								variant="ghost"
-								class="mb-2 bg-[#eef3ec] font-mono text-[11px] text-[#596154]"
-							>
+							<Badge variant="ghost" class="mb-2 bg-[#eef3ec] font-mono text-[11px] text-[#596154]">
 								{#if message.tool.status === 'running'}
 									<LoaderCircle class="animate-spin" />
 								{/if}
 								{message.tool.label}
+							</Badge>
+						{:else if message.loading && !message.content}
+							<Badge variant="ghost" class="mb-2 bg-[#eef3ec] font-mono text-[11px] text-[#596154]">
+								<LoaderCircle class="animate-spin" />
+								working
 							</Badge>
 						{/if}
 						<div
 							class="prose prose-sm max-w-none prose-headings:mt-0 prose-headings:text-[#10120f] prose-p:leading-6 prose-a:text-[#10120f] prose-strong:text-[#10120f] text-[#10120f]"
 						>
 							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-							{@html renderMarkdown(message.content || (message.loading ? 'Thinking...' : ''))}
+							{@html renderMarkdown(message.content)}
 						</div>
 						{#if message.evidence?.length}
-							<div class="mt-2 flex flex-wrap gap-2">
-								{#each message.evidence as item (item.url)}
-									<a
-										href={item.url}
-										class="text-xs text-[#5d675b] underline decoration-[#aeb7aa] underline-offset-4 hover:text-[#10120f]"
-										target="_blank"
-										rel="noreferrer"
-									>
-										{item.title}
-									</a>
-								{/each}
-							</div>
+							<details class="group mt-3 text-xs text-[#596154]/75">
+								<summary
+									class="inline-flex cursor-pointer list-none items-center gap-2 border border-[#10120f]/5 bg-transparent px-2 py-1 font-mono text-[#596154]/70 transition hover:border-[#10120f]/10 hover:text-[#596154] [&::-webkit-details-marker]:hidden"
+								>
+									evidence · {message.evidence.length}
+									<span class="text-[#596154]/45 transition group-open:rotate-90">›</span>
+								</summary>
+								<div class="mt-2 space-y-1 border-l border-[#10120f]/5 pl-3">
+									{#each message.evidence as item, index (item.url)}
+										<a
+											href={item.url}
+											class="block py-0.5 text-[#596154]/70 decoration-[#aeb7aa]/50 underline-offset-4 hover:text-[#10120f] hover:underline"
+											target="_blank"
+											rel="noreferrer"
+										>
+											{evidenceLabel(item, index)}
+										</a>
+									{/each}
+								</div>
+							</details>
 						{/if}
 						{#if message.suggestEmail && !message.emailDraft}
 							<Button

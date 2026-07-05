@@ -6,6 +6,7 @@ pitch.md
 .env.*
 !.env.example
 .agents/
+.codex/memories/
 
 # Python
 .venv/

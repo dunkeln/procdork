@@ -8,5 +8,7 @@ dependencies = [
     "fastapi>=0.139.0",
     "llama-cloud>=2.10.0",
     "mistralai>=2.5.1",
+    "python-dotenv>=1.2.2",
     "unstructured-client>=0.45.0",
+    "uvicorn>=0.50.0",
 ]

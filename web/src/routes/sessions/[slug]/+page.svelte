@@ -188,7 +188,8 @@
 		} catch (caught) {
 			updateMessage(message.id, { emailLoading: false });
 			toast.error('Email draft failed', {
-				description: caught instanceof Error ? caught.message : 'The runtime did not return a draft.'
+				description:
+					caught instanceof Error ? caught.message : 'The runtime did not return a draft.'
 			});
 		}
 	}
@@ -215,68 +216,74 @@
 		</header>
 
 		<div class="flex min-h-0 flex-1 overflow-hidden py-8 lg:py-10">
-			<section id="search" class="flex min-h-0 w-full max-w-3xl min-w-0 flex-col overflow-hidden">
-				<div class="flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-hidden">
-					<h1
-						class={[
-							'overflow-hidden text-5xl leading-[0.96] font-semibold tracking-normal text-balance transition-all duration-300 md:text-7xl',
-							isCompact ? 'max-h-0 translate-y-[-12px] opacity-0' : 'max-h-44 opacity-100'
-						]}
+			<section id="search" class="flex min-h-0 w-full min-w-0 overflow-hidden">
+				<div class="flex min-h-0 w-full overflow-hidden">
+					<div
+						class="mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden transition-all duration-300 lg:w-[70%] lg:flex-none"
 					>
-						Procure suppliers from the live web.
-					</h1>
-					<p
-						class={[
-							'max-w-xl overflow-hidden text-base leading-7 text-[#596154] transition-all duration-300 md:text-lg',
-							isCompact ? 'mt-0 max-h-0 translate-y-[-8px] opacity-0' : 'mt-5 max-h-24 opacity-100'
-						]}
-					>
-						Search filings, vendor pages, news, and research through a web search agent.
-					</p>
-					<form
-						class={[
-							'relative max-w-2xl shrink-0 border border-[#10120f] bg-white shadow-[6px_6px_0_#10120f] transition-all duration-300',
-							isCompact ? 'mt-0' : 'mt-8'
-						]}
-						onsubmit={(event) => (event.preventDefault(), runSearch())}
-					>
-						<textarea
-							bind:this={queryBox}
-							class="block max-h-[104px] min-h-12 w-full resize-none border-0 bg-transparent py-3 pr-24 pl-4 font-mono text-sm leading-5 text-[#10120f] outline-none focus:ring-0"
-							maxlength="500"
-							placeholder="Search suppliers..."
-							rows="1"
-							bind:value={query}
-							oninput={resizeQueryBox}
-							onkeydown={(event) => {
-								if (event.key === 'Enter' && !event.shiftKey) {
-									event.preventDefault();
-									runSearch();
-								}
-							}}></textarea>
-						<Button
-							type="submit"
-							disabled={loading || !query.trim()}
-							aria-label={hasSearched ? 'Send query' : 'Search'}
+						<h1
 							class={[
-								'absolute right-0 bottom-0 h-12 border-l border-[#10120f] bg-[#10120f] text-sm text-white hover:bg-[#10120f]/90',
-								hasSearched ? 'w-12 px-0' : 'px-4'
+								'overflow-hidden text-5xl leading-[0.96] font-semibold tracking-normal text-balance transition-all duration-300 md:text-7xl',
+								isCompact ? 'max-h-0 translate-y-[-12px] opacity-0' : 'max-h-44 opacity-100'
 							]}
 						>
-							{#if hasSearched}
-								<SendHorizontal />
-							{:else}
-								<Search />
-								{loading ? 'Searching' : 'Search'}
-							{/if}
-						</Button>
-					</form>
-					{#if error}
-						<p class="mt-3 shrink-0 text-sm text-[#9a321d]">{error}</p>
-					{/if}
-					{#if messages.length}
-						<ChatBox {messages} onDraftEmail={draftEmail} />
-					{/if}
+							Procure suppliers from the live web.
+						</h1>
+						<p
+							class={[
+								'max-w-xl overflow-hidden text-base leading-7 text-[#596154] transition-all duration-300 md:text-lg',
+								isCompact
+									? 'mt-0 max-h-0 translate-y-[-8px] opacity-0'
+									: 'mt-5 max-h-24 opacity-100'
+							]}
+						>
+							Search filings, vendor pages, news, and research through a web search agent.
+						</p>
+						<form
+							class={[
+								'relative w-full shrink-0 border border-[#10120f] bg-white shadow-[6px_6px_0_#10120f] transition-all duration-300',
+								isCompact ? 'mt-0' : 'mt-8'
+							]}
+							onsubmit={(event) => (event.preventDefault(), runSearch())}
+						>
+							<textarea
+								bind:this={queryBox}
+								class="block max-h-[104px] min-h-12 w-full resize-none border-0 bg-transparent py-3 pr-24 pl-4 font-mono text-sm leading-5 text-[#10120f] outline-none focus:ring-0"
+								maxlength="500"
+								placeholder="Search suppliers..."
+								rows="1"
+								bind:value={query}
+								oninput={resizeQueryBox}
+								onkeydown={(event) => {
+									if (event.key === 'Enter' && !event.shiftKey) {
+										event.preventDefault();
+										runSearch();
+									}
+								}}></textarea>
+							<Button
+								type="submit"
+								disabled={loading || !query.trim()}
+								aria-label={hasSearched ? 'Send query' : 'Search'}
+								class={[
+									'absolute right-0 bottom-0 h-12 border-l border-[#10120f] bg-[#10120f] text-sm text-white hover:bg-[#10120f]/90',
+									hasSearched ? 'w-12 px-0' : 'px-4'
+								]}
+							>
+								{#if hasSearched}
+									<SendHorizontal />
+								{:else}
+									<Search />
+									{loading ? 'Searching' : 'Search'}
+								{/if}
+							</Button>
+						</form>
+						{#if error}
+							<p class="mt-3 shrink-0 text-sm text-[#9a321d]">{error}</p>
+						{/if}
+						{#if messages.length}
+							<ChatBox {messages} onDraftEmail={draftEmail} />
+						{/if}
+					</div>
 				</div>
 			</section>
 		</div>

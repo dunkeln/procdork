@@ -1,32 +1,7 @@
-import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { loadDotenv } from '$lib/server/env';
 import Anthropic from '@anthropic-ai/sdk';
-import { config } from 'dotenv';
 
 let client: Anthropic | undefined;
-let envLoaded = false;
-
-function findDotenv(start = process.cwd()) {
-	let current = start;
-
-	while (true) {
-		const candidate = join(current, '.env');
-
-		if (existsSync(candidate)) return candidate;
-
-		const parent = dirname(current);
-		if (parent === current) return undefined;
-		current = parent;
-	}
-}
-
-function loadDotenv() {
-	if (envLoaded) return;
-
-	const path = findDotenv();
-	if (path) config({ path });
-	envLoaded = true;
-}
 
 export function getAnthropicConfig() {
 	loadDotenv();

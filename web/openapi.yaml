@@ -1,0 +1,339 @@
+openapi: 3.1.0
+info:
+  title: Procdork ingestion service contract
+  version: 0.1.0
+  description: >
+    Contract between the web app and the document/email ingestion microservice.
+    The web app submits evidence pointers; the microservice reads artifacts and
+    returns observed suppliers, canonical supplier suggestions, source claims,
+    and unresolved conflicts.
+servers:
+  - url: http://localhost:8000
+    description: Local ingestion service
+paths:
+  /ingestion/jobs:
+    post:
+      operationId: createIngestionJob
+      summary: Submit evidence pointers for document or email ingestion.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIngestionJobRequest'
+      responses:
+        '202':
+          description: Ingestion job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionJob'
+        '400':
+          description: Invalid request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /ingestion/jobs/{job_id}:
+    get:
+      operationId: getIngestionJob
+      summary: Read ingestion job status and extracted supplier facts.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ingestion job status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionJob'
+        '404':
+          description: Job not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    CreateIngestionJobRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+        - sources
+      properties:
+        session_id:
+          type: string
+          description: Web session slug that discovered or uploaded the artifact.
+        turn_id:
+          type: string
+          description: Optional chat turn identifier that produced the evidence.
+        sources:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/DocumentIngestionRequest'
+    IngestionJob:
+      type: object
+      additionalProperties: false
+      required:
+        - job_id
+        - status
+        - created_at
+        - sources
+        - result
+      properties:
+        job_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - queued
+            - running
+            - succeeded
+            - failed
+            - partial
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentIngestionRequest'
+        result:
+          $ref: '#/components/schemas/IngestionResult'
+        error:
+          type: string
+          description: Present when status is failed or partial.
+    IngestionResult:
+      type: object
+      additionalProperties: false
+      required:
+        - observed_suppliers
+        - canonical_suppliers
+        - source_claims
+        - conflicts
+      properties:
+        observed_suppliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObservedSupplier'
+        canonical_suppliers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanonicalSupplier'
+        source_claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceClaim'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SupplierConflict'
+    DocumentIngestionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - source_id
+        - artifact_type
+        - title
+        - retrieved_at
+      properties:
+        source_id:
+          type: string
+        artifact_type:
+          $ref: '#/components/schemas/ArtifactType'
+        url:
+          type: string
+          format: uri
+        mime_hint:
+          type: string
+          examples:
+            - application/pdf
+            - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        title:
+          type: string
+        retrieved_at:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    ObservedSupplier:
+      type: object
+      additionalProperties: false
+      required:
+        - observed_supplier_id
+        - name
+        - source
+        - extraction_method
+        - confidence
+      properties:
+        observed_supplier_id:
+          type: string
+        name:
+          type: string
+          description: Supplier name exactly as represented by the source.
+        source:
+          $ref: '#/components/schemas/SourceRef'
+        extraction_method:
+          $ref: '#/components/schemas/ExtractionMethod'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
+    CanonicalSupplier:
+      type: object
+      additionalProperties: false
+      required:
+        - canonical_supplier_id
+        - name
+        - observed_supplier_ids
+        - confidence
+        - updated_at
+      properties:
+        canonical_supplier_id:
+          type: string
+        name:
+          type: string
+        observed_supplier_ids:
+          type: array
+          items:
+            type: string
+        confidence:
+          $ref: '#/components/schemas/Confidence'
+        updated_at:
+          type: string
+          format: date-time
+    SourceClaim:
+      type: object
+      additionalProperties: false
+      required:
+        - claim_id
+        - field
+        - value
+        - source
+        - extraction_method
+        - confidence
+        - retrieved_at
+      properties:
+        claim_id:
+          type: string
+        canonical_supplier_id:
+          type: string
+        observed_supplier_id:
+          type: string
+        field:
+          type: string
+          description: Normalized kebab-case field name, such as moq or lead-time-days.
+        value:
+          description: Extracted value. Keep original text when normalization is unsupported.
+        source:
+          $ref: '#/components/schemas/SourceRef'
+        extraction_method:
+          $ref: '#/components/schemas/ExtractionMethod'
+        confidence:
+          $ref: '#/components/schemas/Confidence'
+        retrieved_at:
+          type: string
+          format: date-time
+    SupplierConflict:
+      type: object
+      additionalProperties: false
+      required:
+        - conflict_id
+        - field
+        - claim_ids
+        - status
+      properties:
+        conflict_id:
+          type: string
+        canonical_supplier_id:
+          type: string
+        field:
+          type: string
+        claim_ids:
+          type: array
+          minItems: 2
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+            - open
+            - resolved
+            - other
+        note:
+          type: string
+    SourceRef:
+      type: object
+      additionalProperties: false
+      required:
+        - source_id
+        - artifact_type
+        - title
+        - retrieved_at
+      properties:
+        source_id:
+          type: string
+        artifact_type:
+          $ref: '#/components/schemas/ArtifactType'
+        title:
+          type: string
+        retrieved_at:
+          type: string
+          format: date-time
+        url:
+          type: string
+          format: uri
+        mime_hint:
+          type: string
+          description: MIME type or extension hint for the artifact that produced this evidence.
+        page:
+          type: number
+        row:
+          type: number
+        text_span:
+          type: string
+    ArtifactType:
+      type: string
+      enum:
+        - web-page
+        - email-thread
+        - quote
+        - price-list
+        - coa
+        - sds
+        - spec-sheet
+        - certificate
+        - supplier-questionnaire
+        - other
+    Confidence:
+      type: string
+      enum:
+        - high
+        - medium
+        - low
+        - unknown
+        - other
+    ExtractionMethod:
+      type: string
+      enum:
+        - web-search
+        - web-fetch
+        - document-ingestion
+        - email-ingestion
+        - manual-review
+        - other
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string

@@ -1,4 +1,5 @@
 import { getAnthropicClient, getAnthropicConfig } from '$lib/server/anthropic/client';
+import { textFrom } from '$lib/server/anthropic/messages';
 import { json, type RequestHandler } from '@sveltejs/kit';
 
 type Citation = {
@@ -7,21 +8,6 @@ type Citation = {
 	snippet?: string;
 	source?: string;
 };
-
-function textFrom(content: unknown[]) {
-	return content
-		.map((block) =>
-			typeof block === 'object' &&
-			block !== null &&
-			'type' in block &&
-			block.type === 'text' &&
-			'text' in block &&
-			typeof block.text === 'string'
-				? block.text
-				: ''
-		)
-		.join('');
-}
 
 function parseDraft(text: string) {
 	const subject = text.match(/^Subject:\s*(.+)$/im)?.[1]?.trim() ?? 'Supplier quote request';
@@ -34,7 +20,9 @@ export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json().catch(() => null);
 	const message = typeof body?.message === 'string' ? body.message.trim() : '';
 	const prose = typeof body?.prose === 'string' ? body.prose.trim() : '';
-	const citations = Array.isArray(body?.citations) ? (body.citations as Citation[]).slice(0, 8) : [];
+	const citations = Array.isArray(body?.citations)
+		? (body.citations as Citation[]).slice(0, 8)
+		: [];
 
 	if (!message) return json({ error: 'Message is required.' }, { status: 400 });
 

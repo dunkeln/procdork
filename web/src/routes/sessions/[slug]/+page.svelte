@@ -1,22 +1,116 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import ChatBox, { type ChatMessage, type EvidenceItem } from '$lib/components/chat-box.svelte';
+	import SessionsList from '$lib/components/sessions-list.svelte';
 	import logo from '$lib/assets/procdork-logo.png';
 	import { Button } from '$lib/components/ui/button';
-	import { ArrowUpRight, ChevronRight, Search, SendHorizontal } from '@lucide/svelte';
+	import { ChevronRight, Search, SendHorizontal, X } from '@lucide/svelte';
+	import { onMount } from 'svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import type { PageData } from './$types';
 
-	const docsUrl = 'https://docs.tinyfish.ai/search-api/reference';
-
+	let { data }: { data: PageData } = $props();
 	let query = $state('');
 	let loading = $state(false);
 	let error = $state('');
-	let messages = $state<ChatMessage[]>([]);
-	let hasSearched = $state(false);
+	let creatingSession = $state(false);
+	let deletingSession = $state('');
+	let workspaceMode = $state<'chat' | 'sessions'>('chat');
+	let liveMessages = $state<ChatMessage[] | null>(null);
+	let messages = $derived((liveMessages ?? data.messages) as ChatMessage[]);
+	let hasSearched = $derived(data.messages.length > 0 || liveMessages !== null);
 	let hasQuery = $derived(Boolean(query.trim()));
 	let isCompact = $derived(hasQuery || hasSearched || messages.length > 0);
-	let queryBox: HTMLTextAreaElement;
+	let currentSlug = $derived(page.params.slug ?? '');
+	let queryBox = $state<HTMLTextAreaElement>();
+	let toolFailureToastKeys = $state<string[]>([]);
+
+	onMount(() => {
+		if (data.persistenceWarning) {
+			toast.warning('Persistence unavailable', {
+				description: data.persistenceWarning
+			});
+		}
+	});
+
+	async function newSession() {
+		if (creatingSession) return;
+
+		creatingSession = true;
+		try {
+			const response = await fetch('/api/sessions', { method: 'POST' });
+			const data = await response.json().catch(() => null);
+
+			if (!response.ok || typeof data?.slug !== 'string') {
+				throw new Error(data?.error ?? 'Session creation failed.');
+			}
+
+			await goto(resolve(`/sessions/${data.slug}`));
+		} catch (caught) {
+			toast.error('Session creation failed', {
+				description: caught instanceof Error ? caught.message : 'Could not create a Neon session.'
+			});
+		} finally {
+			creatingSession = false;
+		}
+	}
+
+	function openSession(slug: string) {
+		workspaceMode = 'chat';
+		goto(resolve(`/sessions/${slug}`));
+	}
+
+	async function deleteSession(slug: string) {
+		if (deletingSession) return;
+
+		deletingSession = slug;
+		try {
+			const response = await fetch(resolve(`/api/sessions/${slug}`), { method: 'DELETE' });
+			const data = await response.json().catch(() => null);
+
+			if (!response.ok) {
+				throw new Error(data?.error ?? 'Session deletion failed.');
+			}
+
+			toast.success('Session deleted');
+
+			if (slug === currentSlug) {
+				await goto(resolve('/'));
+			} else {
+				await invalidateAll();
+			}
+		} catch (caught) {
+			toast.error('Session deletion failed', {
+				description: caught instanceof Error ? caught.message : 'Could not delete the session.'
+			});
+		} finally {
+			deletingSession = '';
+		}
+	}
+
+	async function renameSession(slug: string, title: string) {
+		try {
+			const response = await fetch(resolve(`/api/sessions/${slug}`), {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ title })
+			});
+			const data = await response.json().catch(() => null);
+
+			if (!response.ok) {
+				throw new Error(data?.error ?? 'Session rename failed.');
+			}
+
+			await invalidateAll();
+		} catch (caught) {
+			toast.error('Session rename failed', {
+				description: caught instanceof Error ? caught.message : 'Could not rename the session.'
+			});
+		}
+	}
 
 	function resizeQueryBox() {
 		if (!queryBox) return;
@@ -27,17 +121,19 @@
 	}
 
 	function updateMessage(id: string, patch: Partial<ChatMessage>) {
-		messages = messages.map((message) => (message.id === id ? { ...message, ...patch } : message));
+		liveMessages = messages.map((message) =>
+			message.id === id ? { ...message, ...patch } : message
+		);
 	}
 
 	function appendToMessage(id: string, text: string) {
-		messages = messages.map((message) =>
+		liveMessages = messages.map((message) =>
 			message.id === id ? { ...message, content: message.content + text } : message
 		);
 	}
 
 	function appendProgress(id: string, text: string) {
-		messages = messages.map((message) =>
+		liveMessages = messages.map((message) =>
 			message.id === id ? { ...message, progress: `${message.progress ?? ''}${text}` } : message
 		);
 	}
@@ -82,11 +178,25 @@
 			(event.status === 'running' || event.status === 'done' || event.status === 'error')
 		) {
 			updateMessage(assistantId, { tool: { label: event.label, status: event.status } });
+
+			if (event.status === 'error') {
+				const key = `${assistantId}:${event.label}`;
+
+				if (!toolFailureToastKeys.includes(key)) {
+					toolFailureToastKeys = [...toolFailureToastKeys, key];
+					toast.warning(`${event.label} failed`, {
+						description: 'Continuing with the evidence available.'
+					});
+				}
+			}
 		}
 
 		if (event.type === 'error' && 'error' in event && typeof event.error === 'string') {
 			error = event.error;
 			updateMessage(assistantId, { loading: false });
+			toast.error('Runtime failed', {
+				description: event.error
+			});
 		}
 
 		if (event.type === 'done') {
@@ -100,18 +210,12 @@
 
 		const userId = crypto.randomUUID();
 		const assistantId = crypto.randomUUID();
-		const history = messages
-			.slice()
-			.reverse()
-			.filter((item) => item.content.trim())
-			.slice(-6)
-			.map((item) => ({ role: item.role, content: item.content }));
-		const sessionId = location.pathname.split('/').filter(Boolean).pop() ?? 'ephemeral';
+		const sessionId = currentSlug ?? 'ephemeral';
 
 		loading = true;
 		error = '';
-		hasSearched = true;
-		messages = [
+		toolFailureToastKeys = [];
+		liveMessages = [
 			{ id: userId, role: 'user', content: message },
 			{
 				id: assistantId,
@@ -131,7 +235,7 @@
 			const response = await fetch('/api/chat', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ message, history, sessionId })
+				body: JSON.stringify({ message, sessionId })
 			});
 
 			if (!response.ok) {
@@ -227,9 +331,20 @@
 				<span>procdork</span>
 				<span class="font-normal text-[#596154]/70 italic">&lt;search/&gt;</span>
 			</a>
-			<Button href={docsUrl} variant="outline" size="sm" class="border-[#10120f]/20 bg-white/70">
-				TinyFish docs
-				<ArrowUpRight />
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				class="border-[#10120f]/20 bg-white/70"
+				onclick={() => (workspaceMode = workspaceMode === 'sessions' ? 'chat' : 'sessions')}
+			>
+				{#if workspaceMode === 'sessions'}
+					<X />
+					Back to chat
+				{:else}
+					<Search />
+					Search sessions
+				{/if}
 			</Button>
 		</header>
 
@@ -239,67 +354,80 @@
 					<div
 						class="mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden transition-all duration-300 lg:w-[70%] lg:flex-none"
 					>
-						<h1
-							class={[
-								'overflow-hidden text-5xl leading-[0.96] font-semibold tracking-normal text-balance transition-all duration-300 md:text-7xl',
-								isCompact ? 'max-h-0 translate-y-[-12px] opacity-0' : 'max-h-44 opacity-100'
-							]}
-						>
-							Procure suppliers from the live web.
-						</h1>
-						<p
-							class={[
-								'max-w-xl overflow-hidden text-base leading-7 text-[#596154] transition-all duration-300 md:text-lg',
-								isCompact
-									? 'mt-0 max-h-0 translate-y-[-8px] opacity-0'
-									: 'mt-5 max-h-24 opacity-100'
-							]}
-						>
-							Search filings, vendor pages, news, and research through a web search agent.
-						</p>
-						<form
-							class={[
-								'relative w-full shrink-0 border border-[#10120f] bg-white shadow-[6px_6px_0_#10120f] transition-all duration-300',
-								isCompact ? 'mt-0' : 'mt-8'
-							]}
-							onsubmit={(event) => (event.preventDefault(), runSearch())}
-						>
-							<textarea
-								bind:this={queryBox}
-								class="block max-h-[104px] min-h-12 w-full resize-none border-0 bg-transparent py-3 pr-24 pl-4 font-mono text-sm leading-5 text-[#10120f] outline-none focus:ring-0"
-								maxlength="500"
-								placeholder="Search suppliers..."
-								rows="1"
-								bind:value={query}
-								oninput={resizeQueryBox}
-								onkeydown={(event) => {
-									if (event.key === 'Enter' && !event.shiftKey) {
-										event.preventDefault();
-										runSearch();
-									}
-								}}></textarea>
-							<Button
-								type="submit"
-								disabled={loading || !query.trim()}
-								aria-label={hasSearched ? 'Send query' : 'Search'}
+						{#if workspaceMode === 'sessions'}
+							<SessionsList
+								sessions={data.sessions}
+								{currentSlug}
+								creating={creatingSession}
+								deletingSlug={deletingSession}
+								onNewSession={newSession}
+								onOpenSession={openSession}
+								onDeleteSession={deleteSession}
+								onRenameSession={renameSession}
+							/>
+						{:else}
+							<h1
 								class={[
-									'absolute right-0 bottom-0 h-12 border-l border-[#10120f] bg-[#10120f] text-sm text-white hover:bg-[#10120f]/90',
-									hasSearched ? 'w-12 px-0' : 'px-4'
+									'overflow-hidden text-5xl leading-[0.96] font-semibold tracking-normal text-balance transition-all duration-300 md:text-7xl',
+									isCompact ? 'max-h-0 translate-y-[-12px] opacity-0' : 'max-h-44 opacity-100'
 								]}
 							>
-								{#if hasSearched}
-									<SendHorizontal />
-								{:else}
-									<Search />
-									{loading ? 'Searching' : 'Search'}
-								{/if}
-							</Button>
-						</form>
-						{#if error}
-							<p class="mt-3 shrink-0 text-sm text-[#9a321d]">{error}</p>
-						{/if}
-						{#if messages.length}
-							<ChatBox {messages} onDraftEmail={draftEmail} />
+								Procure suppliers from the live web.
+							</h1>
+							<p
+								class={[
+									'max-w-xl overflow-hidden text-base leading-7 text-[#596154] transition-all duration-300 md:text-lg',
+									isCompact
+										? 'mt-0 max-h-0 translate-y-[-8px] opacity-0'
+										: 'mt-5 max-h-24 opacity-100'
+								]}
+							>
+								Search filings, vendor pages, news, and research through a web search agent.
+							</p>
+							<form
+								class={[
+									'relative w-full shrink-0 border border-[#10120f] bg-white shadow-[6px_6px_0_#10120f] transition-all duration-300',
+									isCompact ? 'mt-0' : 'mt-8'
+								]}
+								onsubmit={(event) => (event.preventDefault(), runSearch())}
+							>
+								<textarea
+									bind:this={queryBox}
+									class="block max-h-[104px] min-h-12 w-full resize-none border-0 bg-transparent py-3 pr-24 pl-4 font-mono text-sm leading-5 text-[#10120f] outline-none focus:ring-0"
+									maxlength="500"
+									placeholder="Search and query suppliers..."
+									rows="1"
+									bind:value={query}
+									oninput={resizeQueryBox}
+									onkeydown={(event) => {
+										if (event.key === 'Enter' && !event.shiftKey) {
+											event.preventDefault();
+											runSearch();
+										}
+									}}></textarea>
+								<Button
+									type="submit"
+									disabled={loading || !query.trim()}
+									aria-label={hasSearched ? 'Send query' : 'Search'}
+									class={[
+										'absolute right-0 bottom-0 h-12 border-l border-[#10120f] bg-[#10120f] text-sm text-white hover:bg-[#10120f]/90',
+										hasSearched ? 'w-12 px-0' : 'px-4'
+									]}
+								>
+									{#if hasSearched}
+										<SendHorizontal />
+									{:else}
+										<Search />
+										{loading ? 'Searching' : 'Search'}
+									{/if}
+								</Button>
+							</form>
+							{#if error}
+								<p class="mt-3 shrink-0 text-sm text-[#9a321d]">{error}</p>
+							{/if}
+							{#if messages.length}
+								<ChatBox {messages} onDraftEmail={draftEmail} />
+							{/if}
 						{/if}
 					</div>
 				</div>

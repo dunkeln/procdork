@@ -107,7 +107,7 @@
 								working
 							</Badge>
 						{/if}
-						{#if message.progress}
+						{#if message.progress && !message.content}
 							<div
 								class="mb-3 max-w-[72ch] border-l border-[#10120f]/10 pl-3 font-mono text-xs leading-5 whitespace-pre-wrap text-[#596154]/70"
 							>

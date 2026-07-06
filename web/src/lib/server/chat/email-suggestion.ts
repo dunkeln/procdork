@@ -1,7 +1,12 @@
 import type { ChatCitation } from '$lib/server/tinyfish/procurement-tools';
 
 export function shouldSuggestEmail(message: string) {
-	return /\b(email|outreach|quote|rfq|intro|contact|supplier)\b/i.test(message);
+	const action = String.raw`\b(?:draft|write|compose|prepare|generate|create)\b`;
+	const emailObject = String.raw`\b(?:email|outreach|rfq|quote request|intro(?:duction)?(?: message)?)\b`;
+
+	return new RegExp(`${action}.{0,80}${emailObject}|${emailObject}.{0,80}${action}`, 'i').test(
+		message
+	);
 }
 
 function maskedEmail(text: string) {

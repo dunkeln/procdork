@@ -9,8 +9,7 @@ const response = await fetch(new URL('/api/chat', baseUrl), {
 	headers: { 'content-type': 'application/json' },
 	body: JSON.stringify({
 		message: prompt,
-		sessionId: `e2e-${Date.now()}`,
-		history: []
+		sessionId: `e2e-${Date.now()}`
 	})
 });
 

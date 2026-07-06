@@ -1,5 +1,6 @@
+import { createChatSession } from '$lib/server/storage/chat';
 import { redirect } from '@sveltejs/kit';
 
-export function load() {
-	redirect(307, `/sessions/${crypto.randomUUID()}`);
+export async function load() {
+	redirect(307, `/sessions/${await createChatSession()}`);
 }

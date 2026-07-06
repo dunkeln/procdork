@@ -2,6 +2,12 @@ import { getAnthropicClient, getAnthropicConfig } from '$lib/server/anthropic/cl
 import { streamText, textFrom } from '$lib/server/anthropic/messages';
 import { shouldSuggestEmail, suggestEmailLabel } from '$lib/server/chat/email-suggestion';
 import {
+	completeAssistantMessage,
+	loadPromptHistory,
+	saveMessageEvent,
+	startChatTurn
+} from '$lib/server/storage/chat';
+import {
 	citationsFrom,
 	procurementTools,
 	runProcurementTool,
@@ -22,34 +28,6 @@ function toolUsesFrom(content: unknown[]) {
 	);
 }
 
-function historyFrom(body: unknown): MessageParam[] {
-	if (
-		typeof body !== 'object' ||
-		body === null ||
-		!('history' in body) ||
-		!Array.isArray(body.history)
-	) {
-		return [];
-	}
-
-	return body.history
-		.filter(
-			(item): item is { role: 'user' | 'assistant'; content: string } =>
-				typeof item === 'object' &&
-				item !== null &&
-				'role' in item &&
-				(item.role === 'user' || item.role === 'assistant') &&
-				'content' in item &&
-				typeof item.content === 'string' &&
-				Boolean(item.content.trim())
-		)
-		.slice(-6)
-		.map((item) => ({
-			role: item.role,
-			content: item.content.trim().slice(0, 2500)
-		}));
-}
-
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json().catch(() => null);
 	const message = typeof body?.message === 'string' ? body.message.trim() : '';
@@ -57,7 +35,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		typeof body?.sessionId === 'string' && body.sessionId.trim()
 			? body.sessionId.trim().slice(0, 120)
 			: 'ephemeral';
-	const turnId = crypto.randomUUID();
 
 	if (!message) {
 		return json({ error: 'Message is required.' }, { status: 400 });
@@ -75,16 +52,44 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ error: 'Anthropic API key or model is not configured.' }, { status: 503 });
 	}
 
+	const turnId = crypto.randomUUID();
+	const userMessageId = crypto.randomUUID();
+	const assistantMessageId = crypto.randomUUID();
+	let promptHistory: MessageParam[];
+
+	try {
+		promptHistory = await loadPromptHistory(sessionId);
+		await startChatTurn({
+			sessionSlug: sessionId,
+			turnId,
+			userMessageId,
+			assistantMessageId,
+			message
+		});
+	} catch (error) {
+		return json(
+			{ error: error instanceof Error ? error.message : 'Session persistence is unavailable.' },
+			{ status: 503 }
+		);
+	}
+
 	const stream = new ReadableStream({
 		async start(controller) {
 			const encoder = new TextEncoder();
 			const write = (event: unknown) => controller.enqueue(encoder.encode(ndjson(event)));
 			const anthropic = getAnthropicClient();
 			const evidence: Evidence[] = [];
-			const messages: MessageParam[] = [...historyFrom(body), { role: 'user', content: message }];
+			const messages: MessageParam[] = [...promptHistory, { role: 'user', content: message }];
 			let finalText = '';
-			const writeText = (text: string, channel: 'progress' | 'answer') => {
-				write({ type: 'delta', channel, text });
+			const persistAndWrite = async (
+				event: Record<string, unknown>,
+				messageId = assistantMessageId
+			) => {
+				write(event);
+				await saveMessageEvent({ sessionSlug: sessionId, messageId, turnId, event });
+			};
+			const writeText = async (text: string, channel: 'progress' | 'answer') => {
+				await persistAndWrite({ type: 'delta', channel, text });
 			};
 
 			try {
@@ -105,12 +110,12 @@ export const POST: RequestHandler = async ({ request }) => {
 
 					if (!toolUses.length) {
 						finalText = responseText;
-						if (responseText) writeText(responseText, 'answer');
+						if (responseText) await writeText(responseText, 'answer');
 						answeredWithoutTools = true;
 						break;
 					}
 
-					if (responseText) writeText(responseText, 'progress');
+					if (responseText) await writeText(responseText, 'progress');
 
 					messages.push({
 						role: 'assistant',
@@ -118,14 +123,14 @@ export const POST: RequestHandler = async ({ request }) => {
 					});
 					const toolResults = [];
 					for (const toolUse of toolUses) {
-						write({
+						await persistAndWrite({
 							type: 'tool',
 							name: toolUse.name,
 							label: toolLabel(toolUse.name),
 							status: 'running'
 						});
 						const result = await runProcurementTool(toolUse, evidence, { sessionId, turnId });
-						write({
+						await persistAndWrite({
 							type: 'tool',
 							name: toolUse.name,
 							label: toolLabel(toolUse.name),
@@ -137,7 +142,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						role: 'user',
 						content: toolResults
 					});
-					write({ type: 'evidence', evidence });
+					await persistAndWrite({ type: 'evidence', evidence });
 				}
 
 				if (!answeredWithoutTools) {
@@ -163,7 +168,7 @@ export const POST: RequestHandler = async ({ request }) => {
 						const text = streamText(event);
 						if (text) {
 							finalText += text;
-							writeText(text, 'answer');
+							await writeText(text, 'answer');
 						}
 					}
 				}
@@ -184,24 +189,40 @@ export const POST: RequestHandler = async ({ request }) => {
 						]
 					});
 					finalText = textFrom(finalResponse.content);
-					if (finalText) writeText(finalText, 'answer');
+					if (finalText) await writeText(finalText, 'answer');
 				}
 
 				const citations = citationsFrom(evidence);
-				write({
+				const final = {
 					type: 'final',
 					prose: finalText,
 					citations,
 					suggestEmail: shouldSuggestEmail(message),
 					suggestEmailLabel: suggestEmailLabel(message, finalText, citations)
+				};
+				await completeAssistantMessage({
+					sessionSlug: sessionId,
+					messageId: assistantMessageId,
+					content: finalText,
+					citations,
+					suggestEmail: final.suggestEmail,
+					suggestEmailLabel: final.suggestEmailLabel
 				});
-				write({ type: 'evidence', evidence: citations });
-				write({ type: 'done' });
+				await persistAndWrite(final);
+				await persistAndWrite({ type: 'evidence', evidence: citations });
+				await persistAndWrite({ type: 'done' });
 			} catch (error) {
-				write({
+				const event = {
 					type: 'error',
 					error: error instanceof Error ? error.message : 'Chat runtime failed.'
-				});
+				};
+				write(event);
+				await saveMessageEvent({
+					sessionSlug: sessionId,
+					messageId: assistantMessageId,
+					turnId,
+					event
+				}).catch(() => {});
 			} finally {
 				controller.close();
 			}

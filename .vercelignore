@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+.agents/
+.codex/
+.git/
+**/.vercel/
+harness/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/node_modules/
+web/.svelte-kit/
+web/build/
+web/static/fixtures/

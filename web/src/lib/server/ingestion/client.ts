@@ -14,7 +14,13 @@ const INGESTION_TIMEOUT_MS = 45_000;
 
 export function getIngestionServiceUrl() {
 	loadDotenv();
-	return process.env.INGESTION_SERVICE_URL ?? process.env.DOCUMENT_INGESTION_URL;
+	return process.env.INGESTION_SERVICE_URL ?? process.env.DOCUMENT_INGESTION_URL ?? process.env.INGESTION_URL;
+}
+
+function ingestionUrl(path: string, serviceUrl: string) {
+	const url = new URL(serviceUrl);
+	url.pathname = `${url.pathname.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+	return url;
 }
 
 export function sourceIdFor(url: string) {
@@ -59,7 +65,7 @@ export async function createIngestionJob(input: {
 	const timeout = setTimeout(() => controller.abort(), INGESTION_TIMEOUT_MS);
 
 	try {
-		const response = await fetch(new URL('/ingestion/jobs', serviceUrl), {
+		const response = await fetch(ingestionUrl('/ingestion/jobs', serviceUrl), {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({

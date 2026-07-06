@@ -6,7 +6,7 @@
 	import SessionsList from '$lib/components/sessions-list.svelte';
 	import logo from '$lib/assets/procdork-logo.png';
 	import { Button } from '$lib/components/ui/button';
-	import { ChevronRight, Search, SendHorizontal, X } from '@lucide/svelte';
+	import { Search, SendHorizontal, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -435,12 +435,9 @@
 		</div>
 
 		<div
-			class="mt-auto flex flex-wrap items-center gap-2 border-t border-[#dfe5dc] bg-[#f8faf6]/90 py-4 text-xs text-[#596154] backdrop-blur"
+			class="mt-auto border-t border-[#dfe5dc] bg-[#f8faf6]/90 py-4 text-xs text-[#596154] backdrop-blur"
 		>
-			<span class="font-semibold text-[#10120f]">TinyFish-inspired pattern:</span>
-			<span>command</span>
-			<ChevronRight class="size-3" />
-			<span>server connector</span>
+			procdork © 2026 · Live supplier research, evidence, and session context
 		</div>
 	</div>
 </section>

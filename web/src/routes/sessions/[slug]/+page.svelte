@@ -253,6 +253,7 @@
 
 			const decoder = new TextDecoder();
 			let buffer = '';
+			let streamFailed = false;
 
 			while (true) {
 				const { value, done } = await reader.read();
@@ -261,15 +262,30 @@
 				buffer = lines.pop() ?? '';
 
 				for (const line of lines) {
-					if (line.trim()) handleStreamEvent(JSON.parse(line), assistantId);
+					if (!line.trim()) continue;
+
+					const event = JSON.parse(line);
+					streamFailed ||= event?.type === 'error';
+					handleStreamEvent(event, assistantId);
 				}
 
 				if (done) break;
 			}
 
-			toast.success('Answer ready', {
-				description: 'Response streamed into the chatbox'
-			});
+			if (buffer.trim()) {
+				const event = JSON.parse(buffer);
+				streamFailed ||= event?.type === 'error';
+				handleStreamEvent(event, assistantId);
+			}
+
+			await invalidateAll();
+			liveMessages = null;
+
+			if (!streamFailed) {
+				toast.success('Answer ready', {
+					description: 'Response saved to the session'
+				});
+			}
 		} catch (caught) {
 			error = caught instanceof Error ? caught.message : 'Chat failed before the runtime returned.';
 			updateMessage(assistantId, { content: error, loading: false });

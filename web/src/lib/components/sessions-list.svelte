@@ -74,9 +74,11 @@
 		editingTitle = '';
 	}
 
-	function openAfterClick(slug: string) {
+	function openAfterClick(slug: string, event: MouseEvent) {
 		if (clickTimer) clearTimeout(clickTimer);
-		clickTimer = setTimeout(() => onOpenSession(slug), 180);
+		if (event.detail > 1 || editingSlug) return;
+
+		clickTimer = setTimeout(() => onOpenSession(slug), 260);
 	}
 </script>
 
@@ -118,7 +120,7 @@
 						<button
 							type="button"
 							class="min-w-0 flex-1 px-3 py-3 text-left"
-							onclick={() => openAfterClick(session.slug)}
+							onclick={(event) => openAfterClick(session.slug, event)}
 							ondblclick={(event) => {
 								event.preventDefault();
 								startRename(session);

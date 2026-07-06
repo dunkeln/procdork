@@ -25,6 +25,9 @@
 	let hasQuery = $derived(Boolean(query.trim()));
 	let isCompact = $derived(hasQuery || hasSearched || messages.length > 0);
 	let currentSlug = $derived(page.params.slug ?? '');
+	let currentSessionTitle = $derived(
+		data.sessions.find((session) => session.slug === currentSlug)?.title ?? 'Untitled chat'
+	);
 	let queryBox = $state<HTMLTextAreaElement>();
 	let toolFailureToastKeys = $state<string[]>([]);
 
@@ -345,7 +348,9 @@
 			<a class="flex items-center gap-2 text-sm font-semibold" href={resolve('/')}>
 				<img class="size-11 object-contain" src={logo} alt="" />
 				<span>procdork</span>
-				<span class="font-normal text-[#596154]/70 italic">&lt;search/&gt;</span>
+				<span class="max-w-[44vw] truncate font-normal text-[#596154]/70 italic sm:max-w-80">
+					&lt;search at="{currentSessionTitle}"/&gt;
+				</span>
 			</a>
 			<Button
 				type="button"

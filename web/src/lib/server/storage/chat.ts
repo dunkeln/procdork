@@ -197,7 +197,10 @@ export async function startChatTurn(input: {
 			insert into sessions (slug, title, updated_at)
 			values (${sessionSlug}, ${title}, now())
 			on conflict (slug) do update set
-				title = coalesce(sessions.title, excluded.title),
+				title = case
+					when sessions.title is null or sessions.title = 'Untitled chat' then excluded.title
+					else sessions.title
+				end,
 				updated_at = excluded.updated_at
 		`,
 		txn`

@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: harness
+    schema: main
+    tables:
+      - name: raw_manifest
+        description: Raw capture manifest loaded by the harness EL path.

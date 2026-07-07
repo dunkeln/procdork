@@ -15,6 +15,9 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+harness/data/
+harness/transforms/dbt/logs/
+harness/transforms/dbt/target/
 
 # JavaScript/Svelte
 node_modules/

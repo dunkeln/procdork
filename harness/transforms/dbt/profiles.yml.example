@@ -1,0 +1,7 @@
+procdork_harness:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: ../../data/harness.duckdb
+      schema: main

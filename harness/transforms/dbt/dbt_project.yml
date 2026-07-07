@@ -1,0 +1,14 @@
+name: procdork_harness
+version: "0.1.0"
+config-version: 2
+
+profile: procdork_harness
+
+model-paths: ["models"]
+
+models:
+  procdork_harness:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

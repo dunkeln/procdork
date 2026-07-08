@@ -1,17 +1,30 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
-	"experimentalServices": {
+	"services": {
 		"web": {
-			"entrypoint": "web",
-			"routePrefix": "/",
-			"framework": "sveltekit",
-			"maxDuration": 60
+			"root": "web",
+			"framework": "sveltekit"
 		},
 		"ingestion": {
-			"entrypoint": "microservices/app.py",
-			"routePrefix": "/svc/ingestion",
-			"maxDuration": 60,
-			"excludeFiles": "{tests/**,**/tests/**,**/.venv/**,**/__pycache__/**}"
+			"root": "microservices",
+			"entrypoint": "app:app",
+			"framework": "fastapi",
+			"routes": [
+				{
+					"src": "/svc/ingestion/(.*)",
+					"transforms": [
+						{
+							"type": "request.path",
+							"op": "set",
+							"args": "/$1"
+						}
+					]
+				}
+			]
 		}
-	}
+	},
+	"rewrites": [
+		{ "source": "/svc/ingestion/(.*)", "destination": { "service": "ingestion" } },
+		{ "source": "/(.*)", "destination": { "service": "web" } }
+	]
 }

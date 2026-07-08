@@ -6,6 +6,7 @@
 	import SessionsList from '$lib/components/sessions-list.svelte';
 	import logo from '$lib/assets/procdork-logo.png';
 	import { Button } from '$lib/components/ui/button';
+	import { runOperatorSimulation } from '$lib/simulations/driver';
 	import { procurementOperators, type ProcurementOperator } from '$lib/simulations/operators';
 	import { ChevronDown, Play, Search, SendHorizontal, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
@@ -230,7 +231,13 @@
 			workspaceMode = 'chat';
 			await goto(resolve(`/sessions/${data.slug}`));
 			await tick();
-			await runSearch(operator.prompt, data.slug);
+
+			await runOperatorSimulation({
+				operatorId: operator.id,
+				sessionId: data.slug,
+				nextTurn: nextSimulationTurn,
+				submitTurn: runSearch
+			});
 		} catch (caught) {
 			toast.error('Simulation failed', {
 				description:
@@ -241,9 +248,27 @@
 		}
 	}
 
+	async function nextSimulationTurn(operatorId: string, sessionId: string) {
+		const response = await fetch('/api/simulations/next-turn', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ operatorId, sessionId })
+		});
+		const data = await response.json().catch(() => null);
+
+		if (!response.ok) {
+			throw new Error(data?.error ?? 'Simulation adjudication failed.');
+		}
+
+		return {
+			done: data?.done === true,
+			message: typeof data?.message === 'string' ? data.message : ''
+		};
+	}
+
 	async function runSearch(messageOverride?: string, sessionOverride?: string) {
 		const message = (messageOverride ?? query).trim();
-		if (!message || loading) return;
+		if (!message || loading) return false;
 
 		const userId = crypto.randomUUID();
 		const assistantId = crypto.randomUUID();
@@ -282,7 +307,7 @@
 				toast.error('Search failed', {
 					description: error
 				});
-				return;
+				return false;
 			}
 
 			const reader = response.body?.getReader();
@@ -323,12 +348,15 @@
 					description: 'Response saved to the session'
 				});
 			}
+
+			return !streamFailed;
 		} catch (caught) {
 			error = caught instanceof Error ? caught.message : 'Chat failed before the runtime returned.';
 			updateMessage(assistantId, { content: error, loading: false });
 			toast.error('Search failed', {
 				description: error
 			});
+			return false;
 		} finally {
 			loading = false;
 		}
@@ -426,9 +454,10 @@
 									onclick={() => simulateOperator(operator)}
 								>
 									<span class="block text-sm font-semibold text-[#10120f]">
-										{operator.name} · {operator.company}
+										{operator.name}
+										<span class="font-normal text-[#596154]/70 italic">@{operator.company}</span>
 									</span>
-									<span class="mt-1 block font-mono text-xs text-[#596154]">
+									<span class="mt-1 block font-mono text-[11px] leading-4 text-[#596154]/70">
 										{operator.intent}
 									</span>
 								</button>

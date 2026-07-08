@@ -7,9 +7,8 @@ from mimetypes import guess_extension
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
-import duckdb
-
 from extraction import ExtractedSource, HarnessModel, SourcePointer
+from olap import connect_duckdb
 
 
 class LoadedArtifact(HarnessModel):
@@ -44,10 +43,8 @@ def append_manifest(artifact: LoadedArtifact, manifest_path: Path | str = "data/
         manifest.write(json.dumps(artifact.model_dump(mode="json"), sort_keys=True) + "\n")
 
 
-def load_manifest_duckdb(artifact: LoadedArtifact, db_path: Path | str = "data/harness.duckdb") -> None:
-    path = Path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(path)) as con:
+def load_manifest_duckdb(artifact: LoadedArtifact, db_path: Path | str | None = None) -> None:
+    with connect_duckdb(db_path) as con:
         con.execute(
             """
             create table if not exists raw_manifest (

@@ -10,6 +10,7 @@ from pathlib import Path
 import duckdb
 
 from extraction import HarnessModel
+from olap import connect_duckdb
 
 
 class SqlObservation(HarnessModel):
@@ -62,11 +63,9 @@ def observe_sql(
 
 def record_sql_observation(
     observation: SqlObservation,
-    db_path: Path | str = "data/harness.duckdb",
+    db_path: Path | str | None = None,
 ) -> ObservationRecord:
-    path = Path(db_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(path)) as con:
+    with connect_duckdb(db_path) as con:
         ensure_sql_observations(con)
         con.execute(
             """

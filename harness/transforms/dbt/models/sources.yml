@@ -6,3 +6,16 @@ sources:
     tables:
       - name: raw_manifest
         description: Raw capture manifest loaded by the harness EL path.
+  - name: app
+    schema: main
+    tables:
+      - name: app_sessions
+        description: Demo web chat sessions synced from Neon.
+      - name: app_messages
+        description: Demo web chat messages synced from Neon.
+      - name: app_message_events
+        description: Demo web chat event stream synced from Neon.
+      - name: app_sources
+        description: Demo web cited sources synced from Neon.
+      - name: app_message_sources
+        description: Demo web message-source links synced from Neon.

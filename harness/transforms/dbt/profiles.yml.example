@@ -5,3 +5,9 @@ procdork_harness:
       type: duckdb
       path: ../../data/harness.duckdb
       schema: main
+      threads: 4
+    motherduck:
+      type: duckdb
+      path: "md:procdork_analytics?motherduck_token={{ env_var('MOTHERDUCK_TOKEN') }}&attach_mode=single"
+      schema: main
+      threads: 4

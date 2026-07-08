@@ -49,7 +49,7 @@ observe repeated patterns
 promote only what repeats
 ```
 
-So the A/B is not "DuckDB is faster than a warehouse." The A/B is:
+So the point is not "DuckDB is faster than a warehouse." The point is:
 
 ```text
 Traditional ELT serializes learning behind pipeline/modeling work.
@@ -70,6 +70,44 @@ serial fraction = 0.25
 
 Those numbers are placeholders until measured. The thing we should measure is not generic query speed. It is time from source arrival to first validated reusable mart or MCP tool.
 
+## The Gustafson's Law Moat
+
+Gustafson's Law looks at scaling from the other direction.
+
+Amdahl's Law asks how fast one fixed job can get when more workers help. Gustafson's Law asks how much larger the useful job can become when more workers show up.
+
+In normal words: if the serial part stays small, more people and agents can take on more real work instead of waiting in one line.
+
+That matters for the harness because the useful workload is not one dashboard. It is many teams asking many questions over many sources:
+
+```text
+BI asks for reporting cuts
+QA asks for failure patterns
+DS asks for feature evidence
+programmers ask for operational traces
+execs ask for compact business answers
+```
+
+The moat is that the harness lets that work expand without forcing every question through a modeling bottleneck first.
+
+```text
+raw evidence stays available
+agents explore in parallel
+server-side compute keeps answers compact
+repeated joins become promoted marts
+OKF records the durable meaning
+```
+
+As the number of teams and agents grows, the goal is not just faster execution. The goal is more validated analytical surface area per scarce review hour.
+
+The useful measure is:
+
+```text
+reusable answers created per human review hour
+```
+
+If that number grows as more agents explore the moat, Gustafson's Law is working in our favor.
+
 ## What Stays Raw
 
 Raw evidence belongs in blob storage.
@@ -83,6 +121,10 @@ Raw evidence is the source of truth. It should not be rewritten to fit the first
 DuckDB is the local OLAP surface. MotherDuck can become the shared remote OLAP surface.
 
 This layer is where manifests, SQL observations, and eventually marts are queryable. It is not the raw evidence store. It is the place where we inspect, count, aggregate, and serve.
+
+Set `DUCKDB_PATH=md:procdork_analytics` and `MOTHERDUCK_TOKEN` to send harness manifest and observation tables to MotherDuck. Without `DUCKDB_PATH`, the harness falls back to `data/harness.duckdb`.
+
+Run `uv run python main.py sync-neon-chat` to copy the demo web app's Neon chat tables into the harness OLAP database as `app_*` tables.
 
 ## What Gets Promoted
 
@@ -131,6 +173,8 @@ OKF explains durable behavior.
 ```
 
 That means no one-off SQL in OKF, no raw captures in OKF, and no per-run diary. OKF gets updated after a promoted mart/tool/metric/source contract exists.
+
+Run `uv run python main.py okf-flush` from this directory to refresh OKF from promoted dbt marts.
 
 ## The Leverage
 

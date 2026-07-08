@@ -6,7 +6,8 @@
 	import SessionsList from '$lib/components/sessions-list.svelte';
 	import logo from '$lib/assets/procdork-logo.png';
 	import { Button } from '$lib/components/ui/button';
-	import { Search, SendHorizontal, X } from '@lucide/svelte';
+	import { procurementOperators, type ProcurementOperator } from '$lib/simulations/operators';
+	import { ChevronDown, Play, Search, SendHorizontal, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -20,6 +21,8 @@
 	let deletingSession = $state('');
 	let workspaceMode = $state<'chat' | 'sessions'>('chat');
 	let liveMessages = $state<ChatMessage[] | null>(null);
+	let simulateMenuOpen = $state(false);
+	let simulatingOperator = $state('');
 	let messages = $derived((liveMessages ?? data.messages) as ChatMessage[]);
 	let hasSearched = $derived(data.messages.length > 0 || liveMessages !== null);
 	let hasQuery = $derived(Boolean(query.trim()));
@@ -207,13 +210,44 @@
 		}
 	}
 
-	async function runSearch() {
-		const message = query.trim();
+	async function simulateOperator(operator: ProcurementOperator) {
+		if (loading || simulatingOperator) return;
+
+		simulateMenuOpen = false;
+		simulatingOperator = operator.id;
+		try {
+			const response = await fetch('/api/sessions', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ title: `${operator.name} at ${operator.company}` })
+			});
+			const data = await response.json().catch(() => null);
+
+			if (!response.ok || typeof data?.slug !== 'string') {
+				throw new Error(data?.error ?? 'Simulation session creation failed.');
+			}
+
+			workspaceMode = 'chat';
+			await goto(resolve(`/sessions/${data.slug}`));
+			await tick();
+			await runSearch(operator.prompt, data.slug);
+		} catch (caught) {
+			toast.error('Simulation failed', {
+				description:
+					caught instanceof Error ? caught.message : 'Could not start the operator session.'
+			});
+		} finally {
+			simulatingOperator = '';
+		}
+	}
+
+	async function runSearch(messageOverride?: string, sessionOverride?: string) {
+		const message = (messageOverride ?? query).trim();
 		if (!message || loading) return;
 
 		const userId = crypto.randomUUID();
 		const assistantId = crypto.randomUUID();
-		const sessionId = currentSlug ?? 'ephemeral';
+		const sessionId = sessionOverride ?? currentSlug ?? 'ephemeral';
 
 		loading = true;
 		error = '';
@@ -343,7 +377,7 @@
 
 	<div class="relative mx-auto flex h-dvh w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
 		<header
-			class="flex items-center justify-between gap-4 border-b border-[#dfe5dc] bg-[#f8faf6]/90 pb-4 backdrop-blur"
+			class="relative z-30 flex items-center justify-between gap-4 border-b border-[#dfe5dc] bg-[#f8faf6]/90 pb-4 backdrop-blur"
 		>
 			<a class="flex items-center gap-2 text-sm font-semibold" href={resolve('/')}>
 				<img class="size-11 object-contain" src={logo} alt="" />
@@ -352,21 +386,57 @@
 					&lt;search at="{currentSessionTitle}"/&gt;
 				</span>
 			</a>
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				class="border-[#10120f]/20 bg-white/70"
-				onclick={() => (workspaceMode = workspaceMode === 'sessions' ? 'chat' : 'sessions')}
-			>
-				{#if workspaceMode === 'sessions'}
-					<X />
-					Back to chat
-				{:else}
-					<Search />
-					Search sessions
-				{/if}
-			</Button>
+			<div class="flex items-center gap-2">
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					class="border-[#10120f]/20 bg-white/70"
+					onclick={() => (workspaceMode = workspaceMode === 'sessions' ? 'chat' : 'sessions')}
+				>
+					{#if workspaceMode === 'sessions'}
+						<X />
+						Back to chat
+					{:else}
+						<Search />
+						Search sessions
+					{/if}
+				</Button>
+				<div class="relative">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						disabled={loading || Boolean(simulatingOperator)}
+						class="border-[#10120f]/20 bg-white/70"
+						onclick={() => (simulateMenuOpen = !simulateMenuOpen)}
+					>
+						<Play />
+						Simulate
+						<ChevronDown />
+					</Button>
+					{#if simulateMenuOpen}
+						<div
+							class="absolute top-11 right-0 z-50 w-80 border border-[#10120f] bg-[#f8faf6] p-1 shadow-[5px_5px_0_#10120f]"
+						>
+							{#each procurementOperators as operator (operator.id)}
+								<button
+									type="button"
+									class="block w-full px-3 py-2 text-left hover:bg-white"
+									onclick={() => simulateOperator(operator)}
+								>
+									<span class="block text-sm font-semibold text-[#10120f]">
+										{operator.name} · {operator.company}
+									</span>
+									<span class="mt-1 block font-mono text-xs text-[#596154]">
+										{operator.intent}
+									</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+				</div>
+			</div>
 		</header>
 
 		<div class="flex min-h-0 flex-1 overflow-hidden py-8 lg:py-10">

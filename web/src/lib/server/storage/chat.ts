@@ -58,11 +58,14 @@ export async function ensureChatSchema() {
 	return init;
 }
 
-export async function createChatSession() {
+export async function createChatSession(title?: string) {
 	await ensureChatSchema();
 	const slug = crypto.randomUUID();
 
-	await sql().query('insert into sessions (slug) values ($1)', [slug]);
+	await sql().query('insert into sessions (slug, title) values ($1, $2)', [
+		slug,
+		titleFromMessage(title ?? '')
+	]);
 	return slug;
 }
 

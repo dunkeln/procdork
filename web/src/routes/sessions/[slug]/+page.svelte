@@ -316,6 +316,7 @@
 			const decoder = new TextDecoder();
 			let buffer = '';
 			let streamFailed = false;
+			let sawDone = false;
 
 			while (true) {
 				const { value, done } = await reader.read();
@@ -328,6 +329,7 @@
 
 					const event = JSON.parse(line);
 					streamFailed ||= event?.type === 'error';
+					sawDone ||= event?.type === 'done';
 					handleStreamEvent(event, assistantId);
 				}
 
@@ -337,7 +339,17 @@
 			if (buffer.trim()) {
 				const event = JSON.parse(buffer);
 				streamFailed ||= event?.type === 'error';
+				sawDone ||= event?.type === 'done';
 				handleStreamEvent(event, assistantId);
+			}
+
+			if (!sawDone && !streamFailed) {
+				streamFailed = true;
+				error = 'Chat stream ended before the final response was saved.';
+				updateMessage(assistantId, { loading: false });
+				toast.error('Search incomplete', {
+					description: error
+				});
 			}
 
 			await invalidateAll();

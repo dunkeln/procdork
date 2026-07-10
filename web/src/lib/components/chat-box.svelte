@@ -129,7 +129,7 @@
 									<span class="text-[#596154]/45 transition group-open:rotate-90">›</span>
 								</summary>
 								<div class="mt-2 space-y-1 border-l border-[#10120f]/5 pl-3">
-									{#each message.evidence as item, index (item.url)}
+									{#each message.evidence as item, index}
 										<!-- eslint-disable svelte/no-navigation-without-resolve -->
 										<a
 											href={item.url}

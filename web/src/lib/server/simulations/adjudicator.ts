@@ -1,14 +1,20 @@
 import { getAnthropicClient, getAnthropicConfig } from '$lib/server/anthropic/client';
 import { loadSessionMessages } from '$lib/server/storage/chat';
 import { procurementOperators } from '$lib/simulations/operators';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { z } from 'zod';
 
-function parseJsonObject(text: string) {
-	const start = text.indexOf('{');
-	const end = text.lastIndexOf('}');
-	if (start === -1 || end === -1 || end <= start) return null;
-
-	return JSON.parse(text.slice(start, end + 1)) as unknown;
-}
+const adjudicationSchema = z.object({
+	requirements: z.array(
+		z.object({
+			id: z.string(),
+			satisfied: z.boolean(),
+			evidence: z.string().max(240)
+		})
+	),
+	establishedFacts: z.array(z.string().max(240)).max(12),
+	nextConcern: z.string().max(240).nullable()
+});
 
 export async function nextSimulationTurn(operatorId: string, sessionId: string) {
 	const operator = procurementOperators.find((item) => item.id === operatorId);
@@ -18,26 +24,56 @@ export async function nextSimulationTurn(operatorId: string, sessionId: string) 
 	if (!messages.length) {
 		return {
 			done: false,
-			message: operator.openingMessage,
-			satisfied: [],
-			missing: operator.requirements.map((item) => item.id),
-			requirements: operator.requirements
+			message: operator.openingMessage
 		};
 	}
 
-	const transcript = messages
-		.slice()
-		.reverse()
-		.slice(-12)
+	const conversation = messages.slice().reverse();
+	const transcript = conversation
+		.map((message) => `${message.role}: ${message.content.slice(0, 1600)}`)
+		.join('\n\n');
+	const recentConversation = conversation
+		.slice(-10)
 		.map((message) => `${message.role}: ${message.content.slice(0, 1600)}`)
 		.join('\n\n');
 
 	const { model } = getAnthropicConfig();
-	const response = await getAnthropicClient().messages.create({
+	const anthropic = getAnthropicClient();
+	const adjudicationResponse = await anthropic.messages.parse({
 		model,
-		max_tokens: 700,
+		max_tokens: 3000,
+		output_config: { format: zodOutputFormat(adjudicationSchema) },
 		system:
-			'You simulate a real procurement operator, not the assistant. Decide whether the procurement requirement is satisfied from the transcript. If gaps remain, ask the next natural first-person follow-up as the operator. Do not roleplay the assistant. Return only compact JSON.',
+			'Privately evaluate a procurement conversation against its requirements. Mark a requirement satisfied only when the transcript contains concrete support for its done condition. Return every requirement exactly once. Keep each evidence statement and established fact under 20 words. Extract only facts established by the assistant responses. If anything remains unsatisfied, choose one next business concern that advances the objective without retrying an exhausted line of inquiry; otherwise return null.',
+		messages: [
+			{
+				role: 'user',
+				content: JSON.stringify({
+					requirements: operator.requirements,
+					transcript
+				})
+			}
+		]
+	});
+
+	const adjudication = adjudicationResponse.parsed_output;
+	if (!adjudication) {
+		throw new Error(
+			`Simulation adjudicator returned no result (${adjudicationResponse.stop_reason}).`
+		);
+	}
+
+	const status = new Map(
+		adjudication.requirements.map((requirement) => [requirement.id, requirement.satisfied])
+	);
+	const done = operator.requirements.every((requirement) => status.get(requirement.id) === true);
+	if (done) return { done: true, message: '' };
+
+	const operatorResponse = await anthropic.messages.create({
+		model,
+		max_tokens: 1200,
+		system:
+			'You are the procurement operator speaking to the assistant. Respond only to the conversation in front of you. You know your business objective, but you are not completing or auditing a checklist. Make one natural conversational move in first person, using the current concern as direction rather than wording. Follow what is most salient, uncertain, or consequential in the latest answer. Ask about one connected concern at a time, accept explicitly exhausted unknowns, do not bundle unrelated requests to finish faster, and do not mention requirements, scoring, simulation, or evaluation. Return only the next message in 1-3 sentences.',
 		messages: [
 			{
 				role: 'user',
@@ -46,41 +82,26 @@ export async function nextSimulationTurn(operatorId: string, sessionId: string) 
 						name: operator.name,
 						company: operator.company,
 						profile: operator.profile,
-						intent: operator.intent
+						intent: operator.intent,
+						overallObjective: operator.openingMessage
 					},
-					requirements: operator.requirements,
-					transcript,
-					response_shape: {
-						done: 'boolean',
-						satisfied: ['requirement-id'],
-						missing: ['requirement-id'],
-						message: 'next operator message, empty when done'
-					}
+					currentConcern: adjudication.nextConcern,
+					establishedFacts: adjudication.establishedFacts,
+					recentConversation
 				})
 			}
 		]
 	});
 
-	const text = response.content
+	const message = operatorResponse.content
 		.map((block) => ('text' in block ? block.text : ''))
 		.join('')
 		.trim();
-	const parsed = parseJsonObject(text);
 
-	if (
-		typeof parsed !== 'object' ||
-		parsed === null ||
-		!('done' in parsed) ||
-		typeof parsed.done !== 'boolean'
-	) {
-		throw new Error('Simulation adjudicator returned invalid JSON.');
-	}
+	if (!message) throw new Error('Simulation operator returned no next message.');
 
 	return {
-		done: parsed.done,
-		message: 'message' in parsed && typeof parsed.message === 'string' ? parsed.message.trim() : '',
-		satisfied: 'satisfied' in parsed && Array.isArray(parsed.satisfied) ? parsed.satisfied : [],
-		missing: 'missing' in parsed && Array.isArray(parsed.missing) ? parsed.missing : [],
-		requirements: operator.requirements
+		done: false,
+		message
 	};
 }

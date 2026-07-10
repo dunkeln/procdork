@@ -119,7 +119,7 @@ export async function loadPromptHistory(sessionSlug: string): Promise<MessagePar
 		`
 			select role, content
 			from messages
-			where session_slug = $1 and content <> ''
+			where session_slug = $1 and (role = 'user' or completed_at is not null) and content <> ''
 			order by created_at desc, case role when 'assistant' then 0 else 1 end, id desc
 			limit $2
 		`,
@@ -237,6 +237,13 @@ export async function saveMessageEvent(input: {
 }) {
 	await ensureChatSchema();
 	const sessionSlug = normalizeSlug(input.sessionSlug);
+	const answerDelta =
+		input.messageId &&
+		input.event.type === 'delta' &&
+		input.event.channel !== 'progress' &&
+		typeof input.event.text === 'string'
+			? input.event.text
+			: '';
 	await sql().transaction((txn) => [
 		txn`
 			insert into message_events (session_slug, message_id, turn_id, event_type, event)
@@ -248,6 +255,15 @@ export async function saveMessageEvent(input: {
 				${JSON.stringify(input.event)}::jsonb
 			)
 		`,
+		...(answerDelta
+			? [
+					txn`
+						update messages
+						set content = content || ${answerDelta}
+						where id = ${input.messageId} and session_slug = ${sessionSlug} and role = 'assistant'
+					`
+				]
+			: []),
 		txn`update sessions set updated_at = now() where slug = ${sessionSlug}`
 	]);
 }

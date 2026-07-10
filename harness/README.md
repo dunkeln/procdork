@@ -2,7 +2,7 @@
 
 The harness is the backend for procdork's data moat.
 
-It is not just an ETL script. It is where raw evidence lands, where repeated SQL behavior is observed, where durable marts get promoted, and where MCP tools eventually serve stable answers back to clients.
+It is not just an ETL script. It is where raw evidence lands, repeatable transforms run, and MCP clients receive both live answers and reviewed organizational context.
 
 ## The Simple Story
 
@@ -14,13 +14,14 @@ source -> connector -> warehouse -> dbt -> marts -> BI/API/MCP
 
 That can work, but it makes the slowest part happen early. Before we know the useful questions, we are already choosing vendor paths, shaping schemas, writing dbt models, and creating product surfaces.
 
-The harness flips that around.
+The harness separates the data plane from the knowledge plane.
 
 ```text
-source -> raw evidence -> DuckDB/MotherDuck -> read-only SQL -> observations -> promoted mart -> semantic MCP -> OKF
+data:      source -> raw evidence -> DuckDB/MotherDuck -> dbt marts -> MCP tools
+knowledge: reviewed OKF bundle -------------------------------> MCP resources
 ```
 
-We capture the source first. We keep the raw bytes. We make the evidence queryable. Then we watch what questions repeat. Only after a pattern proves useful do we promote it into a dbt mart, expose it as a semantic MCP tool, and document it in OKF.
+We capture the source first, keep the raw bytes, and make the evidence queryable. Engineers can add dbt models when reproducibility or a product contract requires one. Stable definitions, join guidance, caveats, and playbooks are reviewed separately into the Git-authored OKF bundle. Agents can read that context before and while they use live tools.
 
 ## The Amdahl's Law Bet
 
@@ -45,15 +46,14 @@ The harness tries to make the serial section smaller:
 capture raw evidence
 load manifest/index
 let people/agents explore
-observe repeated patterns
-promote only what repeats
+build shared transforms only when useful
 ```
 
 So the point is not "DuckDB is faster than a warehouse." The point is:
 
 ```text
 Traditional ELT serializes learning behind pipeline/modeling work.
-Harness parallelizes learning over raw evidence, then serializes only promotion.
+Harness lets learning begin over raw evidence before shared modeling is required.
 ```
 
 Example hypothesis:
@@ -68,7 +68,7 @@ serial fraction = 0.25
 4 workers speedup = 1 / (0.25 + 0.75 / 4) = 2.29x
 ```
 
-Those numbers are placeholders until measured. The thing we should measure is not generic query speed. It is time from source arrival to first validated reusable mart or MCP tool.
+Those numbers are placeholders until measured. The thing we should measure is not generic query speed. It is time from source arrival to a validated reusable answer.
 
 ## The Gustafson's Law Moat
 
@@ -94,8 +94,8 @@ The moat is that the harness lets that work expand without forcing every questio
 raw evidence stays available
 agents explore in parallel
 server-side compute keeps answers compact
-repeated joins become promoted marts
-OKF records the durable meaning
+shared dbt models remove known recomputation
+OKF supplies durable meaning to every client
 ```
 
 As the number of teams and agents grows, the goal is not just faster execution. The goal is more validated analytical surface area per scarce review hour.
@@ -120,61 +120,71 @@ Raw evidence is the source of truth. It should not be rewritten to fit the first
 
 DuckDB is the local OLAP surface. MotherDuck can become the shared remote OLAP surface.
 
-This layer is where manifests, SQL observations, and eventually marts are queryable. It is not the raw evidence store. It is the place where we inspect, count, aggregate, and serve.
+This layer is where manifests, loaded source tables, and marts are queryable. It is not the raw evidence store. It is the place where we inspect, count, aggregate, and serve.
 
-Set `DUCKDB_PATH=md:procdork_analytics` and `MOTHERDUCK_TOKEN` to send harness manifest and observation tables to MotherDuck. Without `DUCKDB_PATH`, the harness falls back to `data/harness.duckdb`.
+Set `DUCKDB_PATH=md:procdork_analytics` and `MOTHERDUCK_TOKEN` to send harness tables to MotherDuck. Without `DUCKDB_PATH`, the harness falls back to `data/harness.duckdb`.
 
 Run `uv run python main.py sync-neon-chat` to copy the demo web app's Neon chat tables into the harness OLAP database as `app_*` tables.
 
-## What Gets Promoted
+## What Gets Built
 
 Read-only SQL is for discovery.
 
-Repeated SQL sessions become evidence. Evidence can create a promotion candidate. A human decides if the candidate is real. Then it can become:
+The harness does not rank queries or infer what deserves permanence. Notebook and ad hoc SQL can remain exploratory. An engineer writes a dbt model when a result needs to be reproducible, shared, tested, or served through a stable product contract.
 
 ```text
-dbt mart -> semantic MCP tool -> OKF concept
+exploration -> explicit engineering decision -> dbt model or MCP tool
 ```
 
-This is deliberate. Promotion is the serial gate that prevents schema sprawl.
+Knowledge remains independent:
+
+```text
+stable understanding -> reviewed OKF concept -> MCP resource
+```
+
+One path may reference the other, but neither waits for the other. This avoids speculative machinery while keeping both computation and meaning reviewable.
 
 ## MCP Shape
 
-The harness should eventually serve MCP over HTTP.
-
-It has two faces:
+The harness serves MCP over HTTP using three distinct protocol surfaces:
 
 ```text
-admin/exploration MCP:
-  run_readonly_sql
-  observe_sql_session
-  list_promotion_candidates
-
-product/semantic MCP:
-  get_capture_summary
-  get_supplier_risk_summary
-  explain_metric
+resources: reviewed OKF context
+prompts:   user-selected workflows for QA, engineering, or executive work
+tools:     live queries and computations over shared models
 ```
 
-The product client should not know table names, SQL text, storage paths, or whether compute is local DuckDB or MotherDuck. The client should consume stable tools exposed by the harness.
+The current `serve-mcp` slice exposes the OKF bundle as read-only resources. Query tools and audience prompts arrive only when their contracts are backed by real usage.
 
-Raw SQL MCP is the discovery backdoor. Semantic MCP is the product surface.
+The product client should not know table names, SQL text, storage paths, or whether compute is local DuckDB or MotherDuck. Stable MCP tools will hide those implementation details.
 
 ## OKF Shape
 
-OKF is not the database, not telemetry, and not the transform engine.
-
-OKF explains durable promoted behavior:
+OKF is not the database, telemetry, transform engine, or runtime-owned state. It is a versioned knowledge bundle written in Markdown and reviewed in Git.
 
 ```text
-DuckDB records evidence.
-dbt/MCP materialize durable behavior.
-OKF explains durable behavior.
+DuckDB/MotherDuck hold current evidence.
+dbt models hold repeatable computation.
+OKF holds durable meaning.
+MCP serves resources and tools without owning either source of truth.
 ```
 
-That means no one-off SQL in OKF, no raw captures in OKF, and no per-run diary. OKF gets updated after a promoted mart/tool/metric/source contract exists.
+That means no one-off SQL, raw captures, volatile values, or per-run diary in OKF. A data engineer can steward the bundle, but the relevant domain owner reviews business, QA, compliance, or operational claims.
 
-Run `uv run python main.py okf-flush` from this directory to refresh OKF from promoted dbt marts.
+Production serves the bundle read-only. New knowledge is drafted, reviewed, merged, and deployed; runtime never writes it.
+
+## Deployment Shape
+
+The code boundaries stay separate while deployment remains one container image.
+
+```text
+docker build -t procdork-harness .
+docker run --rm -p 8000:8000 procdork-harness
+```
+
+The image defaults to `python main.py serve-mcp`. On AWS, run it as one private ECS/Fargate service. EventBridge can start the same image as finite ECS tasks with command overrides such as `python main.py sync-neon-chat` or `dbt run`. Storage stays outside the container in S3/R2 and MotherDuck.
+
+There is no OKF refresh job. A merged bundle ships with the next image. Keep the MCP endpoint private until an explicit authentication boundary exists.
 
 ## The Leverage
 
@@ -182,10 +192,10 @@ The moat is not one vendor or one clever model, it's the loop:
 
 ```text
 preserve raw evidence
-observe real analytical behavior
-promote only repeated value
-serve stable MCP tools
-document durable knowledge
+explore without pre-modeling every question
+author shared transforms only where useful
+review durable knowledge in Git
+serve stable MCP resources and tools
 ```
 
-Small first. Measured later. Promotion only when the evidence earns it.
+Small first. Measured later. Add machinery only when operating evidence earns it.

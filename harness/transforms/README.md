@@ -1,7 +1,7 @@
 # Harness transforms
 
-This directory is the promotion boundary for transform work.
+This directory holds repeatable transform work.
 
-- `dbt/` holds promoted, repeatable SQL transforms.
-- Ad hoc DuckDB SQL stays transient until it proves useful enough to promote.
-- OKF files describe promoted assets later; they do not execute transforms.
+- `dbt/` holds shared, repeatable SQL transforms.
+- Ad hoc DuckDB SQL can stay in notebooks until an engineer needs reproducibility.
+- OKF may describe a model's durable meaning, but it is authored and reviewed independently.

@@ -28,3 +28,4 @@ Open Knowledge Format (OKF) standardizes the knowledge surface by organizing con
 within a unified directory structure. Each file uses structured YAML metadata for categorization and standard
 relative links to map relationships, enabling AI agents to trace dependencies and retrieve context without heavy database indexing.
 Do not turn OKF into a parallel database or schema regime unless the harness proves Markdown/YAML is insufficient.
+The Git-authored OKF bundle is the source of truth. Runtime code may serve it read-only but must not generate or mutate it.

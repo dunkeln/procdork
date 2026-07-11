@@ -4,7 +4,6 @@ from base64 import urlsafe_b64encode
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
-from html import escape
 from math import isfinite
 import os
 from typing import Literal
@@ -160,12 +159,7 @@ def decode_chart(token: str) -> ChartPayload:
 
 def render_svg(payload: ChartPayload) -> str:
     if payload.chart_kind == "table":
-        return (
-            '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img">'
-            '<rect width="960" height="540" fill="#ffffff"/>'
-            f'<text x="48" y="52" font-family="system-ui,sans-serif" font-size="24" font-weight="700" fill="#171717">{safe(payload.title)}</text>'
-            f"{table_svg(payload)}</svg>"
-        )
+        raise ValueError("Tables render as Markdown, not SVG")
 
     data = {
         "label": [str(row[0]) for row in payload.rows],
@@ -189,23 +183,16 @@ def render_svg(payload: ChartPayload) -> str:
     return plot.to_svg(w=960, h=540, unit="px")
 
 
-def table_svg(payload: ChartPayload) -> str:
-    column_width = 864 / max(len(payload.columns), 1)
-    cells = []
-    for column, label in enumerate(payload.columns):
-        cells.append(
-            f'<text x="{48 + column * column_width:.1f}" y="100" font-family="system-ui,sans-serif" font-size="13" font-weight="700" fill="#171717">{safe(short(label, 18))}</text>'
+def render_markdown_table(payload: ChartPayload) -> str:
+    def cell(value: object) -> str:
+        return (
+            str(value if value is not None else "")
+            .replace("|", "\\|")
+            .replace("\n", "<br>")
         )
-    for row_index, row in enumerate(payload.rows):
-        y = 134 + row_index * 30
-        cells.append(
-            f'<line x1="48" y1="{y + 8}" x2="912" y2="{y + 8}" stroke="#e5e5e5"/>'
-        )
-        for column, value in enumerate(row):
-            cells.append(
-                f'<text x="{48 + column * column_width:.1f}" y="{y}" font-family="system-ui,sans-serif" font-size="12" fill="#404040">{safe(short(str(value) if value is not None else "", 18))}</text>'
-            )
-    return "".join(cells)
+
+    lines = [payload.columns, ["---"] * len(payload.columns), *payload.rows]
+    return "\n".join(f"| {' | '.join(cell(value) for value in row)} |" for row in lines)
 
 
 # Encrypt chart payloads so public links stay stateless, private, and tamper-evident.
@@ -230,11 +217,3 @@ def json_value(value: object) -> str | int | float | bool | None:
 
 def number(value: float) -> str:
     return f"{value:,.2f}".rstrip("0").rstrip(".")
-
-
-def short(value: str, limit: int = 14) -> str:
-    return value if len(value) <= limit else value[: limit - 1] + "..."
-
-
-def safe(value: str) -> str:
-    return escape(value, quote=True)

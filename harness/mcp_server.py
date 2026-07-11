@@ -15,7 +15,13 @@ from jwt import PyJWKClient
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 
-from charts import build_chart, decode_chart, encode_chart, render_svg
+from charts import (
+    build_chart,
+    decode_chart,
+    encode_chart,
+    render_markdown_table,
+    render_svg,
+)
 from olap import connect_duckdb, load_dotenv_once
 
 
@@ -77,8 +83,8 @@ mcp = FastMCP(
     "procdork",
     instructions=(
         "Use OKF resources for durable context and chart guidance. Analytics tools are read-only. "
-        "Query results return an ephemeral chart and deterministic key facts instead of raw rows. "
-        "Answer from key_facts; do not recompute values from the visual. Include the Markdown chart image when useful."
+        "Query results return a Markdown table or an ephemeral chart plus deterministic key facts. "
+        "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),
     icons=[
         Icon(
@@ -121,30 +127,28 @@ def query(
     title: str = "Analytics result",
     chart_kind: Literal["auto", "line", "bar", "table"] = "auto",
 ) -> CallToolResult:
-    """Run one read-only SQL statement and return an ephemeral chart plus deterministic key facts."""
+    """Run one read-only SQL statement and return a bounded table or chart plus key facts."""
     columns, rows, truncated = execute_readonly(sql, 25)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
-    token, expires_at = encode_chart(payload)
-    chart_url = f"{public_origin()}/charts/{token}.svg"
+    structured: dict[str, object] = {
+        "title": payload.title,
+        "chart_kind": payload.chart_kind,
+        "key_facts": payload.key_facts,
+        "truncated": payload.truncated,
+    }
+    if payload.chart_kind == "table":
+        result = render_markdown_table(payload)
+    else:
+        token, expires_at = encode_chart(payload)
+        chart_url = f"{public_origin()}/charts/{token}.svg"
+        result = f"![{payload.title}]({chart_url})"
+        structured.update(chart_url=chart_url, expires_at=expires_at)
     markdown = "\n".join(
-        [
-            payload.title,
-            "",
-            *(f"- {fact}" for fact in payload.key_facts),
-            "",
-            f"![{payload.title}]({chart_url})",
-        ]
+        [payload.title, "", result, "", *(f"- {fact}" for fact in payload.key_facts)]
     )
     return CallToolResult(
         content=[TextContent(type="text", text=markdown)],
-        structuredContent={
-            "title": payload.title,
-            "chart_kind": payload.chart_kind,
-            "chart_url": chart_url,
-            "key_facts": payload.key_facts,
-            "truncated": payload.truncated,
-            "expires_at": expires_at,
-        },
+        structuredContent=structured,
     )
 
 
@@ -233,10 +237,11 @@ async def health(_: Request) -> PlainTextResponse:
 async def chart(request: Request) -> Response:
     try:
         payload = decode_chart(request.path_params["token"])
+        svg = render_svg(payload)
     except ValueError as error:
         return PlainTextResponse(str(error), status_code=404)
     return Response(
-        render_svg(payload),
+        svg,
         media_type="image/svg+xml",
         headers={
             "Cache-Control": "private, max-age=300",

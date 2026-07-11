@@ -45,7 +45,7 @@ def sync_neon_chat_command(duckdb_path: str | None) -> None:
 
 @main.command("serve-mcp")
 def serve_mcp_command() -> None:
-    """Serve the Git-authored OKF bundle as read-only MCP resources."""
+    """Serve procdork's read-only analytics and OKF MCP surface."""
     from mcp_server import serve
 
     serve()

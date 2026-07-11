@@ -146,17 +146,18 @@ One path may reference the other, but neither waits for the other. This avoids s
 
 ## MCP Shape
 
-The harness serves MCP over HTTP using three distinct protocol surfaces:
+The harness serves an agent-agnostic MCP endpoint named `procdork` over HTTP.
 
 ```text
 resources: reviewed OKF context
-prompts:   user-selected workflows for QA, engineering, or executive work
-tools:     live queries and computations over shared models
+tools:     mart discovery, mart description, and bounded read-only SQL
 ```
 
-The current `serve-mcp` slice exposes the OKF bundle as read-only resources. Query tools and audience prompts arrive only when their contracts are backed by real usage.
+The server uses DuckDB's parser to accept one `SELECT`, `DESCRIBE`, `SHOW`, or `EXPLAIN` statement, disables external access, and caps returned rows. Any MCP client can connect to the same `/mcp` endpoint without repository-specific client configuration.
 
-The product client should not know table names, SQL text, storage paths, or whether compute is local DuckDB or MotherDuck. Stable MCP tools will hide those implementation details.
+This is an application-enforced boundary, not a database permission boundary: the current `MOTHERDUCK_TOKEN` remains write-capable. Keep the endpoint private and the token server-side. Add database-enforced read-only credentials when the operating risk or plan justifies them.
+
+Set `WORKOS_AUTHKIT_DOMAIN` and `MCP_RESOURCE_URL` together to require WorkOS OAuth. Leave both unset for local development. The WorkOS dashboard must list the MCP URL as a Resource Indicator and enable CIMD or DCR for client registration.
 
 ## OKF Shape
 
@@ -172,19 +173,6 @@ MCP serves resources and tools without owning either source of truth.
 That means no one-off SQL, raw captures, volatile values, or per-run diary in OKF. A data engineer can steward the bundle, but the relevant domain owner reviews business, QA, compliance, or operational claims.
 
 Production serves the bundle read-only. New knowledge is drafted, reviewed, merged, and deployed; runtime never writes it.
-
-## Deployment Shape
-
-The code boundaries stay separate while deployment remains one container image.
-
-```text
-docker build -t procdork-harness .
-docker run --rm -p 8000:8000 procdork-harness
-```
-
-The image defaults to `python main.py serve-mcp`. On AWS, run it as one private ECS/Fargate service. EventBridge can start the same image as finite ECS tasks with command overrides such as `python main.py sync-neon-chat` or `dbt run`. Storage stays outside the container in S3/R2 and MotherDuck.
-
-There is no OKF refresh job. A merged bundle ships with the next image. Keep the MCP endpoint private until an explicit authentication boundary exists.
 
 ## The Leverage
 

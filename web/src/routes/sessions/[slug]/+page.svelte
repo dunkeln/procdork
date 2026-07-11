@@ -4,7 +4,7 @@
 	import { page } from '$app/state';
 	import ChatBox, { type ChatMessage, type EvidenceItem } from '$lib/components/chat-box.svelte';
 	import SessionsList from '$lib/components/sessions-list.svelte';
-	import logo from '$lib/assets/procdork-logo.png';
+	const logo = '/procdork-logo.png';
 	import { Button } from '$lib/components/ui/button';
 	import { runOperatorSimulation } from '$lib/simulations/driver';
 	import { procurementOperators, type ProcurementOperator } from '$lib/simulations/operators';

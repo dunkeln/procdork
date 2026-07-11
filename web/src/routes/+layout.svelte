@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import logo from '$lib/assets/procdork-logo.png';
+	const logo = '/procdork-logo.png';
 	import { Toaster } from '$lib/components/ui/sonner';
 
 	let { children } = $props();

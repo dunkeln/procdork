@@ -5,7 +5,6 @@
 .codex/
 .git/
 **/.vercel/
-harness/
 **/.venv/
 **/__pycache__/
 **/.pytest_cache/

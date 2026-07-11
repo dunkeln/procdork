@@ -24,8 +24,10 @@ The rubric driving our idea:
 
 ### Build with caution - be conservative
 
+Do not add container or Docker deployment work until the harness runtime is stable and deployment is explicitly revisited.
+
 Open Knowledge Format (OKF) standardizes the knowledge surface by organizing concepts into individual Markdown files
 within a unified directory structure. Each file uses structured YAML metadata for categorization and standard
 relative links to map relationships, enabling AI agents to trace dependencies and retrieve context without heavy database indexing.
 Do not turn OKF into a parallel database or schema regime unless the harness proves Markdown/YAML is insufficient.
-The Git-authored OKF bundle is the source of truth. Runtime code may serve it read-only but must not generate or mutate it.
+The Git-authored OKF bundle is the source of truth. Consumers read it directly; runtime code must not generate or mutate it.

@@ -21,10 +21,35 @@
 					]
 				}
 			]
+		},
+		"harness": {
+			"root": "harness",
+			"entrypoint": "vercel_app:app",
+			"framework": "fastapi",
+			"routes": [
+				{
+					"src": "/mcp(.*)",
+					"transforms": [
+						{
+							"type": "request.path",
+							"op": "set",
+							"args": "/mcp$1"
+						}
+					]
+				},
+				{
+					"src": "/.well-known/oauth-protected-resource/mcp"
+				}
+			]
 		}
 	},
 	"rewrites": [
 		{ "source": "/svc/ingestion/(.*)", "destination": { "service": "ingestion" } },
+		{ "source": "/mcp(.*)", "destination": { "service": "harness" } },
+		{
+			"source": "/.well-known/oauth-protected-resource/mcp",
+			"destination": { "service": "harness" }
+		},
 		{ "source": "/(.*)", "destination": { "service": "web" } }
 	]
 }

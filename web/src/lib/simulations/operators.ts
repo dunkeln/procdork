@@ -24,23 +24,27 @@ export const procurementOperators: ProcurementOperator[] = [
 		requirements: [
 			{
 				id: 'independent-us-distributors',
-				description: 'Find independent US distributor candidates, not marketplaces or manufacturers only.',
+				description:
+					'Find independent US distributor candidates, not marketplaces or manufacturers only.',
 				doneWhen: 'At least two candidates are identified with source-backed distributor evidence.'
 			},
 			{
 				id: 'grade-and-packaging',
 				description: 'Confirm USP or USP/FCC citric acid fit and practical bulk packaging signals.',
-				doneWhen: 'Each leading candidate has grade and packaging marked as found, not found, or not listed.'
+				doneWhen:
+					'Each leading candidate has grade and packaging marked as found, not found, or not listed.'
 			},
 			{
 				id: 'lead-time-baseline',
 				description: 'Compare public lead-time or availability evidence against a 5-day baseline.',
-				doneWhen: 'Lead time is either source-backed or explicitly marked as requiring official quote confirmation.'
+				doneWhen:
+					'Lead time is either source-backed or explicitly marked as requiring official quote confirmation.'
 			},
 			{
 				id: 'quote-path',
 				description: 'Identify the best quote/contact path for 15,000 kg.',
-				doneWhen: 'One preferred supplier has a concrete sales, RFQ, or inquiry path and open questions listed.'
+				doneWhen:
+					'One preferred supplier has a concrete sales, RFQ, or inquiry path and open questions listed.'
 			}
 		]
 	},
@@ -55,12 +59,15 @@ export const procurementOperators: ProcurementOperator[] = [
 		requirements: [
 			{
 				id: 'quality-documents',
-				description: 'Find public SDS, COA, spec sheet, kosher, halal, allergen, or equivalent quality signals.',
-				doneWhen: 'Candidates have document evidence or clear document gaps, with retrieval freshness when available.'
+				description:
+					'Find public SDS, COA, spec sheet, kosher, halal, allergen, or equivalent quality signals.',
+				doneWhen:
+					'Candidates have document evidence or clear document gaps, with retrieval freshness when available.'
 			},
 			{
 				id: 'regulated-fit',
-				description: 'Assess likely food or regulated-product suitability without inventing unsupported certifications.',
+				description:
+					'Assess likely food or regulated-product suitability without inventing unsupported certifications.',
 				doneWhen: 'Each leading supplier has fit stated as supported, uncertain, or not found.'
 			},
 			{
@@ -86,23 +93,65 @@ export const procurementOperators: ProcurementOperator[] = [
 		requirements: [
 			{
 				id: 'buying-signals',
-				description: 'Find suppliers with MOQ, packaging, price break, lead-time, or RFQ-path evidence.',
-				doneWhen: 'At least three options are compared or the search explains why fewer credible options surfaced.'
+				description:
+					'Find suppliers with MOQ, packaging, price break, lead-time, or RFQ-path evidence.',
+				doneWhen:
+					'At least three options are compared or the search explains why fewer credible options surfaced.'
 			},
 			{
 				id: 'cost-friction',
-				description: 'Compare pricing visibility, quote requirement, MOQ friction, and packaging fit.',
+				description:
+					'Compare pricing visibility, quote requirement, MOQ friction, and packaging fit.',
 				doneWhen: 'Each candidate has practical buying friction summarized without hiding unknowns.'
 			},
 			{
 				id: 'freight-practicality',
-				description: 'Consider whether packaging and supplier path make sense for bulk snack ingredient sourcing.',
-				doneWhen: 'Freight or packaging practicality is stated as good, uncertain, or poor for leading options.'
+				description:
+					'Consider whether packaging and supplier path make sense for bulk snack ingredient sourcing.',
+				doneWhen:
+					'Freight or packaging practicality is stated as good, uncertain, or poor for leading options.'
 			},
 			{
 				id: 'next-outreach',
 				description: 'Recommend the lowest-risk outreach plus backups.',
 				doneWhen: 'One primary option and two backups are named with what to confirm next.'
+			}
+		]
+	},
+	{
+		id: 'cactus-jack-launch-sourcing',
+		name: 'Cactus Jack',
+		company: 'Utopia Provisions',
+		profile: 'Limited-drop snack buyer with arena-sized ambition and no patience for late pallets.',
+		intent: 'Launch-ready popping-candy sourcing without a festival-sized logistics surprise.',
+		openingMessage:
+			'We are building a limited-run snack with food-grade popping candy, and the drop is six weeks out. Find US suppliers that can support samples now and a 500 kg production order later. I care about MOQ, packaging, allergen documentation, humidity or storage limits, and a lead time that will not turn launch week into a headline.',
+		requirements: [
+			{
+				id: 'credible-us-suppliers',
+				description: 'Find credible US supplier or distributor paths for food-grade popping candy.',
+				doneWhen:
+					'At least three candidates are compared or the evidence explains why fewer qualify.'
+			},
+			{
+				id: 'sample-to-scale',
+				description:
+					'Check sample availability, MOQ, packaging, and a plausible path to a 500 kg order.',
+				doneWhen:
+					'Each leading candidate has sample and production-scale buying signals or explicit gaps.'
+			},
+			{
+				id: 'quality-and-handling',
+				description: 'Find allergen, food-grade, specification, and humidity or storage evidence.',
+				doneWhen:
+					'Quality and handling claims are source-backed or clearly marked for confirmation.'
+			},
+			{
+				id: 'launch-readiness',
+				description:
+					'Assess six-week lead-time risk and identify a primary supplier plus a backup.',
+				doneWhen:
+					'A primary and backup path are named with lead-time unknowns and concrete RFQ contacts.'
 			}
 		]
 	}

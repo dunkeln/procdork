@@ -1,9 +1,0 @@
-.env
-.env.*
-.git
-.venv
-__pycache__
-*.pyc
-data
-transforms/dbt/logs
-transforms/dbt/target

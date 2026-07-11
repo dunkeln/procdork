@@ -3,6 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+# Vercel functions do not guarantee HOME; DuckDB needs it for local state.
+if not os.environ.get("HOME"):
+    os.environ["HOME"] = "/tmp"
+
 import duckdb
 
 
@@ -24,7 +28,11 @@ def connect_duckdb(value: Path | str | None = None) -> duckdb.DuckDBPyConnection
 
 
 def is_local_duckdb_path(path: str) -> bool:
-    return path not in {":memory:"} and "://" not in path and not path.startswith(("md:", "motherduck:"))
+    return (
+        path not in {":memory:"}
+        and "://" not in path
+        and not path.startswith(("md:", "motherduck:"))
+    )
 
 
 def load_dotenv_once() -> None:

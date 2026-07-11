@@ -5,6 +5,8 @@ description: All-time counts for the chat snapshot currently loaded from Neon.
 resource: ../../transforms/dbt/models/marts/mart_chat_summary.sql
 tags: [chat, neon, transform]
 timestamp: 2026-07-10T00:00:00Z
+interpretations:
+  - "table: inspect exact snapshot counts; one all-time row does not support a trend or category chart"
 ---
 
 # Meaning

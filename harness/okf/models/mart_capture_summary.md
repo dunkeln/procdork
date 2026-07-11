@@ -5,6 +5,9 @@ description: Capture volume grouped by source type and extraction adapter.
 resource: ../../transforms/dbt/models/marts/mart_capture_summary.sql
 tags: [harness, captures, transform]
 timestamp: 2026-07-10T00:00:00Z
+interpretations:
+  - "bar: compare artifact_count or total_bytes by source_type and source_adapter_name"
+  - "table: inspect exact first_loaded_at and last_loaded_at bounds; they are not a time series"
 ---
 
 # Meaning

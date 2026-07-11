@@ -11,6 +11,7 @@
 **/.mypy_cache/
 **/.ruff_cache/
 **/node_modules/
+harness/e2e/
 web/.svelte-kit/
 web/build/
 web/static/fixtures/

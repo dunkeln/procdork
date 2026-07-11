@@ -3,7 +3,7 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 snapshot=${1:-$(date -u +%Y%m%dT%H%M%SZ)}
-output="$root/mcp/snapshots/$snapshot"
+output="$root/e2e/snapshots/$snapshot"
 mkdir -p "$output"
 
 run() {

@@ -16,6 +16,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 harness/data/
+harness/e2e/snapshots/
 harness/transforms/dbt/logs/
 harness/transforms/dbt/target/
 

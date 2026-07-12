@@ -136,6 +136,33 @@ Set `DUCKDB_PATH=md:procdork_analytics` and `MOTHERDUCK_TOKEN` to send harness t
 
 Run `uv run python main.py sync-neon-chat` to copy the demo web app's Neon chat tables into the harness OLAP database as `app_*` tables.
 
+## Evaluation Replay
+
+Evaluation starts from a real historical case, reruns its original request
+against a chosen deployment, evaluates the new response, and records the exact
+request, response, citations, versions, and evidence URL.
+
+```text
+historical case -> live/preview deployment -> evaluator -> raw result -> dbt marts -> MCP
+```
+
+Run both prior successes and failures by default:
+
+```bash
+uv run python main.py eval-replay --system-version <release-or-commit>
+```
+
+Use `--previous-result fail` while repairing known failures. Use
+`--previous-result pass` before promotion to check that known-good behavior did
+not regress. Replay sessions use an `eval-` prefix, remain auditable in the app,
+and are excluded from future seed-case selection.
+
+dbt publishes the latest case state in `mart_evaluation_cases`, the repair queue
+in `mart_evaluation_failures`, known-good anchors in
+`mart_evaluation_successes`, and pass-to-fail changes in
+`mart_evaluation_regressions`. These marts appear through the existing MCP mart
+tools without a new runtime surface.
+
 ## What Gets Built
 
 Read-only SQL is for discovery.

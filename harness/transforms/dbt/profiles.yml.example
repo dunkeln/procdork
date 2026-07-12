@@ -3,7 +3,7 @@ procdork_harness:
   outputs:
     local:
       type: duckdb
-      path: ../../data/harness.duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../../data/harness.duckdb') }}"
       schema: main
       threads: 4
     motherduck:

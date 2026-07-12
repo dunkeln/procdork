@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 import json
+from typing import Literal
 
+import duckdb
 from extraction import HarnessModel
-from olap import connect_duckdb
 from pydantic import Field
 
 
@@ -22,61 +23,82 @@ class EvaluationResult(HarnessModel):
     evaluated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-def record_evaluation(evaluation: EvaluationResult, db_path: str | None = None) -> None:
+def ensure_evaluation_table(con: duckdb.DuckDBPyConnection) -> None:
+    con.execute(
+        """
+        create table if not exists raw_evaluation_results (
+            run_id varchar,
+            case_id varchar,
+            dataset_version varchar,
+            system_version varchar,
+            evaluator_name varchar,
+            evaluator_version varchar,
+            score double,
+            result varchar,
+            evidence_uri varchar,
+            metadata json,
+            evaluated_at timestamptz
+        )
+        """
+    )
+
+
+def record_evaluation(
+    con: duckdb.DuckDBPyConnection, evaluation: EvaluationResult
+) -> None:
     """Persist one provider-neutral evaluation result for dbt to transform."""
-    with connect_duckdb(db_path) as con:
+    ensure_evaluation_table(con)
+    con.execute("begin")
+    try:
         con.execute(
             """
-            create table if not exists raw_evaluation_results (
-                run_id varchar,
-                case_id varchar,
-                dataset_version varchar,
-                system_version varchar,
-                evaluator_name varchar,
-                evaluator_version varchar,
-                score double,
-                result varchar,
-                evidence_uri varchar,
-                metadata json,
-                evaluated_at timestamptz
-            )
-            """
+            delete from raw_evaluation_results
+            where case_id = ? and dataset_version = ? and system_version = ?
+              and evaluator_name = ? and evaluator_version = ?
+            """,
+            [
+                evaluation.case_id,
+                evaluation.dataset_version,
+                evaluation.system_version,
+                evaluation.evaluator_name,
+                evaluation.evaluator_version,
+            ],
         )
-        con.execute("begin")
-        try:
-            con.execute(
-                """
-                delete from raw_evaluation_results
-                where case_id = ? and dataset_version = ? and system_version = ?
-                  and evaluator_name = ? and evaluator_version = ?
-                """,
-                [
-                    evaluation.case_id,
-                    evaluation.dataset_version,
-                    evaluation.system_version,
-                    evaluation.evaluator_name,
-                    evaluation.evaluator_version,
-                ],
-            )
-            con.execute(
-                """
-                insert into raw_evaluation_results values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json, ?)
-                """,
-                [
-                    evaluation.run_id,
-                    evaluation.case_id,
-                    evaluation.dataset_version,
-                    evaluation.system_version,
-                    evaluation.evaluator_name,
-                    evaluation.evaluator_version,
-                    evaluation.score,
-                    evaluation.result,
-                    evaluation.evidence_uri,
-                    json.dumps(evaluation.metadata, sort_keys=True),
-                    evaluation.evaluated_at,
-                ],
-            )
-            con.execute("commit")
-        except Exception:
-            con.execute("rollback")
-            raise
+        con.execute(
+            """
+            insert into raw_evaluation_results values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::json, ?)
+            """,
+            [
+                evaluation.run_id,
+                evaluation.case_id,
+                evaluation.dataset_version,
+                evaluation.system_version,
+                evaluation.evaluator_name,
+                evaluation.evaluator_version,
+                evaluation.score,
+                evaluation.result,
+                evaluation.evidence_uri,
+                json.dumps(evaluation.metadata, sort_keys=True),
+                evaluation.evaluated_at,
+            ],
+        )
+        con.execute("commit")
+    except Exception:
+        con.execute("rollback")
+        raise
+
+
+def latest_result(
+    con: duckdb.DuckDBPyConnection, case_id: str, evaluator_name: str
+) -> tuple[Literal["pass", "fail"], float | None, str] | None:
+    row = con.execute(
+        """
+        select result, score, system_version
+        from raw_evaluation_results
+        where case_id = ? and evaluator_name = ?
+        order by evaluated_at desc
+        limit 1
+        """,
+        [case_id, evaluator_name],
+    ).fetchone()
+    return row if row else None

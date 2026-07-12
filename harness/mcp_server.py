@@ -25,7 +25,7 @@ from charts import (
 from olap import connect_duckdb, load_dotenv_once
 
 
-OKF_ROOT = Path(__file__).parent / "okf"
+KNOWLEDGE_ROOT = Path(__file__).parent / "knowledge"
 MAX_QUERY_ROWS = int(os.getenv("MCP_MAX_QUERY_ROWS", "500"))
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -107,15 +107,15 @@ def reader(path: Path) -> Callable[[], str]:
     return read
 
 
-for okf_path in sorted(OKF_ROOT.rglob("*.md")):
-    concept_id = okf_path.relative_to(OKF_ROOT).with_suffix("").as_posix()
+for knowledge_path in sorted(KNOWLEDGE_ROOT.rglob("*.md")):
+    concept_id = knowledge_path.relative_to(KNOWLEDGE_ROOT).with_suffix("").as_posix()
     mcp.resource(
         f"okf://bundle/{concept_id}",
         name=concept_id,
         title=concept_id.replace("/", " / ").replace("_", " ").title(),
         description=f"Git-authored OKF document: {concept_id}",
         mime_type="text/markdown",
-    )(reader(okf_path))
+    )(reader(knowledge_path))
 
 
 @mcp.tool(

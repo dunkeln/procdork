@@ -6,6 +6,8 @@ sources:
     tables:
       - name: raw_manifest
         description: Raw capture manifest loaded by the harness EL path.
+      - name: raw_evaluation_results
+        description: Provider-neutral results written by scheduled evaluator jobs.
   - name: app
     schema: main
     tables:

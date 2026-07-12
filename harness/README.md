@@ -23,6 +23,16 @@ knowledge: reviewed OKF bundle -------------------------------> MCP resources
 
 We capture the source first, keep the raw bytes, and make the evidence queryable. Engineers can add dbt models when reproducibility or a product contract requires one. Stable definitions, join guidance, caveats, and playbooks are reviewed separately into the Git-authored OKF bundle. Agents can read that context before and while they use live tools.
 
+## Code Boundary
+
+The harness owns typed evidence, loading rules, transforms, knowledge, and the MCP surface. External systems live under `connectors/` and translate into those contracts.
+
+```text
+connectors -> typed harness stages -> DuckDB/dbt -> MCP
+```
+
+Entrypoints wire connectors into stages with ordinary callables or open connections. Core stages do not select providers. This keeps future schedulers or agent loops free to wrap the same stages without putting orchestration, state, or provider registries into the harness today.
+
 ## The Amdahl's Law Bet
 
 Amdahl's Law says speedup is capped by the part of the system that cannot be parallelized.

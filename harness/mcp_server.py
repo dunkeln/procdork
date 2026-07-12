@@ -5,13 +5,9 @@ from pathlib import Path
 from typing import Callable, Literal
 from urllib.parse import urlsplit
 
-import jwt
 from duckdb import StatementType
 from mcp.server.fastmcp import FastMCP
-from mcp.server.auth.provider import AccessToken
-from mcp.server.auth.settings import AuthSettings
 from mcp.types import CallToolResult, Icon, TextContent, ToolAnnotations
-from jwt import PyJWKClient
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 
@@ -22,6 +18,7 @@ from charts import (
     render_markdown_table,
     render_svg,
 )
+from connectors.workos import workos_auth
 from olap import connect_duckdb, load_dotenv_once
 
 
@@ -32,53 +29,7 @@ READ_ONLY = ToolAnnotations(
 )
 
 
-class WorkOSTokenVerifier:
-    def __init__(self, issuer: str, audience: str) -> None:
-        self.issuer = issuer.rstrip("/")
-        self.audience = audience
-        self.jwks = PyJWKClient(f"{self.issuer}/oauth2/jwks")
-
-    async def verify_token(self, token: str) -> AccessToken | None:
-        try:
-            key = self.jwks.get_signing_key_from_jwt(token)
-            claims = jwt.decode(
-                token,
-                key.key,
-                algorithms=["RS256"],
-                audience=self.audience,
-                issuer=self.issuer,
-            )
-        except jwt.PyJWTError:
-            return None
-
-        scopes = claims.get("scope") or ""
-        return AccessToken(
-            token=token,
-            client_id=claims.get("client_id") or claims.get("azp") or "",
-            scopes=scopes.split() if isinstance(scopes, str) else scopes,
-            expires_at=claims.get("exp"),
-            resource=self.audience,
-            subject=claims.get("sub"),
-            claims=claims,
-        )
-
-
-def workos_auth() -> dict[str, object]:
-    load_dotenv_once()
-    issuer = os.getenv("WORKOS_AUTHKIT_DOMAIN")
-    resource = os.getenv("MCP_RESOURCE_URL")
-    if not issuer and not resource:
-        return {}
-    if not issuer or not resource:
-        raise RuntimeError(
-            "WORKOS_AUTHKIT_DOMAIN and MCP_RESOURCE_URL must be configured together"
-        )
-    return {
-        "token_verifier": WorkOSTokenVerifier(issuer, resource),
-        "auth": AuthSettings(issuer_url=issuer, resource_server_url=resource),
-    }
-
-
+load_dotenv_once()
 mcp = FastMCP(
     "procdork",
     instructions=(
@@ -96,7 +47,10 @@ mcp = FastMCP(
     host=os.getenv("HOST", "0.0.0.0"),
     port=int(os.getenv("PORT", "8000")),
     stateless_http=True,
-    **workos_auth(),
+    **workos_auth(
+        os.getenv("WORKOS_AUTHKIT_DOMAIN"),
+        os.getenv("MCP_RESOURCE_URL"),
+    ),
 )
 
 

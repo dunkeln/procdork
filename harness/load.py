@@ -5,6 +5,7 @@ from hashlib import sha256
 import json
 from mimetypes import guess_extension
 from pathlib import Path, PurePosixPath
+from typing import Callable
 from urllib.parse import urlparse
 
 from extraction import ExtractedSource, HarnessModel, SourcePointer
@@ -20,29 +21,20 @@ class LoadedArtifact(HarnessModel):
     loaded_at: datetime
 
 
-def load_raw(extracted: ExtractedSource, storage_root: Path | str = "data/lake") -> LoadedArtifact:
+BlobWriter = Callable[[str, bytes], str]
+
+
+def load_raw(extracted: ExtractedSource, writer: BlobWriter) -> LoadedArtifact:
     digest = sha256(extracted.payload).hexdigest()
     key = object_key(extracted.source.source_type, digest, extracted.source.uri, extracted.source.content_type)
-    destination = Path(storage_root) / key
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(extracted.payload)
     return LoadedArtifact(
         artifact_id=f"art_{digest[:12]}",
         source=extracted.source,
-        storage_uri=f"local://{key}",
+        storage_uri=writer(key, extracted.payload),
         sha256=digest,
         bytes=len(extracted.payload),
         loaded_at=datetime.now(UTC),
     )
-
-
-def append_manifest(artifact: LoadedArtifact, manifest_path: Path | str = "data/manifest.jsonl") -> None:
-    path = Path(manifest_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as manifest:
-        manifest.write(json.dumps(artifact.model_dump(mode="json"), sort_keys=True) + "\n")
-
-
 def load_manifest_duckdb(artifact: LoadedArtifact, db_path: Path | str | None = None) -> None:
     with connect_duckdb(db_path) as con:
         con.execute(

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+from functools import partial
+import os
 from pathlib import Path
 
 import click
 
+from connectors.neon import sync_neon_chat
+from connectors.sources import read_url_or_file
+from connectors.storage import append_jsonl, write_local_blob
 from extraction import extract_source
-from load import append_manifest, load_manifest_duckdb, load_raw
-from neon_source import sync_neon_chat
+from load import load_manifest_duckdb, load_raw
+from olap import connect_duckdb, load_dotenv_once
 
 
 @click.group()
@@ -23,10 +28,13 @@ def main() -> None:
 def extract(source: str, source_type: str, storage_root: str, duckdb_path: str | None, manifest_jsonl: str | None) -> None:
     """Extract a URL or local file, then load raw bytes into the harness lake."""
     try:
-        artifact = load_raw(extract_source(source, source_type), Path(storage_root))
+        artifact = load_raw(
+            extract_source(source, read_url_or_file, source_type),
+            partial(write_local_blob, storage_root=Path(storage_root)),
+        )
         load_manifest_duckdb(artifact, duckdb_path)
         if manifest_jsonl:
-            append_manifest(artifact, Path(manifest_jsonl))
+            append_jsonl(artifact, Path(manifest_jsonl))
     except (OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(artifact.model_dump_json(indent=2))
@@ -37,7 +45,9 @@ def extract(source: str, source_type: str, storage_root: str, duckdb_path: str |
 def sync_neon_chat_command(duckdb_path: str | None) -> None:
     """Copy demo chat tables from Neon into the harness OLAP database."""
     try:
-        result = sync_neon_chat(duckdb_path)
+        load_dotenv_once()
+        with connect_duckdb(duckdb_path) as connection:
+            result = sync_neon_chat(connection, os.environ.get("DATABASE_URL", ""))
     except (OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(result.model_dump_json(indent=2))

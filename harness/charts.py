@@ -18,6 +18,8 @@ from lets_plot import (
     geom_point,
     ggplot,
     labs,
+    scale_color_manual,
+    scale_fill_manual,
     theme,
 )
 from pydantic import BaseModel
@@ -55,8 +57,13 @@ def build_chart(
         value_index = numeric_column(rows)
         if value_index is None or len(columns) < 2:
             raise ValueError(f"{kind} charts require a dimension and a numeric measure")
-        selected_columns = [columns[0], columns[value_index]]
-        selected_rows = [[row[0], row[value_index]] for row in rows[:12]]
+        segmented = len(columns) == 3 and value_index == 2
+        selected_columns = columns if segmented else [columns[0], columns[value_index]]
+        selected_rows = (
+            [list(row) for row in rows[:12]]
+            if segmented
+            else [[row[0], row[value_index]] for row in rows[:12]]
+        )
         truncated = truncated or len(rows) > 12
 
     normalized_rows = [[json_value(value) for value in row] for row in selected_rows]
@@ -117,18 +124,31 @@ def chart_facts(
         row_label = "row" if len(rows) == 1 else "rows"
         facts = [f"{len(rows)} {row_label} shown across {len(columns)} columns."]
     else:
+        value_index = len(columns) - 1
         points = [
-            (str(row[0]), float(row[1]))
+            (str(row[0]), float(row[value_index]))
             for row in rows
-            if isinstance(row[1], (int, float))
+            if isinstance(row[value_index], (int, float))
         ]
-        highest = max(points, key=lambda point: point[1])
-        facts = [
-            f"{len(points)} points plotted.",
-            f"Highest {columns[1]}: {number(highest[1])} at {highest[0]}.",
-            f"Displayed total {columns[1]}: {number(sum(value for _, value in points))}.",
-        ]
-        if kind == "line" and len(points) > 1:
+        measure = columns[value_index]
+        if len(columns) == 3:
+            totals: dict[str, float] = {}
+            for label, value in points:
+                totals[label] = totals.get(label, 0) + value
+            highest = max(totals.items(), key=lambda point: point[1])
+            facts = [
+                f"{len(points)} points plotted across {len({str(row[1]) for row in rows})} segments.",
+                f"Highest total {measure}: {number(highest[1])} at {highest[0]}.",
+                f"Displayed total {measure}: {number(sum(value for _, value in points))}.",
+            ]
+        else:
+            highest = max(points, key=lambda point: point[1])
+            facts = [
+                f"{len(points)} points plotted.",
+                f"Highest {measure}: {number(highest[1])} at {highest[0]}.",
+                f"Displayed total {measure}: {number(sum(value for _, value in points))}.",
+            ]
+        if kind == "line" and len(points) > 1 and len(columns) == 2:
             start, end = points[0][1], points[-1][1]
             change = (
                 f"{number(end - start)} absolute"
@@ -161,26 +181,59 @@ def render_svg(payload: ChartPayload) -> str:
     if payload.chart_kind == "table":
         raise ValueError("Tables render as Markdown, not SVG")
 
+    segmented = len(payload.columns) == 3
     data = {
         "label": [str(row[0]) for row in payload.rows],
-        "value": [float(row[1]) for row in payload.rows],
-        "series": [payload.columns[1]] * len(payload.rows),
+        "value": [float(row[-1]) for row in payload.rows],
+        "series": [str(row[1]) for row in payload.rows]
+        if segmented
+        else [payload.columns[1]] * len(payload.rows),
     }
+    colors = segment_palette(len(set(data["series"])))
     plot = ggplot(data, aes("label", "value", group="series"))
-    plot += (
-        geom_line(color="#2563eb", size=1.2) + geom_point(color="#2563eb", size=4)
-        if payload.chart_kind == "line"
-        else geom_bar(stat="identity", fill="#2563eb", width=0.65)
-    )
+    if payload.chart_kind == "line":
+        plot += (
+            geom_line(aes(color="series"), size=1.2)
+            + geom_point(aes(color="series"), size=4)
+            + scale_color_manual(values=colors)
+            if segmented
+            else geom_line(color="#b8b8ff", size=1.2)
+            + geom_point(color="#b8b8ff", size=4)
+        )
+    else:
+        plot += (
+            geom_bar(aes(fill="series"), stat="identity", width=0.65)
+            + scale_fill_manual(values=colors)
+            if segmented
+            else geom_bar(stat="identity", fill="#b8b8ff", width=0.65)
+        )
     plot += labs(
-        title=payload.title, x=payload.columns[0], y=payload.columns[1]
+        title=payload.title,
+        x=payload.columns[0],
+        y=payload.columns[-1],
+        color=payload.columns[1],
+        fill=payload.columns[1],
     ) + theme(
         axis_text_x=element_text(angle=30, hjust=1),
+        legend_position="bottom",
         panel_background=element_rect(fill="#ffffff"),
         plot_background=element_rect(fill="#ffffff"),
         plot_title=element_text(size=20, face="bold"),
     )
     return plot.to_svg(w=960, h=540, unit="px")
+
+
+def segment_palette(count: int) -> list[str]:
+    start, end = (184, 184, 255), (206, 66, 87)
+    steps = max(count - 1, 1)
+    return [
+        "#"
+        + "".join(
+            f"{round(a + (b - a) * index / steps):02x}"
+            for a, b in zip(start, end)
+        )
+        for index in range(count)
+    ]
 
 
 def render_markdown_table(payload: ChartPayload) -> str:

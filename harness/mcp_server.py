@@ -33,7 +33,9 @@ load_dotenv_once()
 mcp = FastMCP(
     "procdork",
     instructions=(
-        "Use knowledge resources for durable context and chart guidance. Analytics tools are read-only. "
+        "Begin every analytical workflow by reading okf://bundle/index, then follow only the relevant "
+        "knowledge links before deciding whether to use any tools. Do not begin with table discovery or querying. "
+        "Analytics tools are read-only. "
         "Query results return a Markdown table or an ephemeral chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),
@@ -81,7 +83,7 @@ def query(
     title: str = "Analytics result",
     chart_kind: Literal["auto", "line", "bar", "table"] = "auto",
 ) -> CallToolResult:
-    """Run one read-only SQL statement and return a bounded table or chart plus key facts."""
+    """Run read-only SQL. Select category, segment, value for a segmented bar or line chart."""
     columns, rows, truncated = execute_readonly(sql, 25)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
     structured: dict[str, object] = {

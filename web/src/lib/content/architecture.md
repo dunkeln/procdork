@@ -23,3 +23,6 @@ It becomes critical an operator sits in the loop, because the operator adjudicat
 
 OKF is the durable knowledge surface produced where forward-deployed discovery meets data-engineering rigor.
 OKF becomes the shared contract between field reality, institutional meaning, and the underlying data, without turning it into a centrally invented data-team glossary.
+
+
+## scratchpad

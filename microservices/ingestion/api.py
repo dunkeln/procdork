@@ -16,7 +16,11 @@ service = JobService()
 
 @app.post("/ingestion/jobs", response_model=IngestionJob, status_code=202)
 def create_ingestion_job(request: CreateIngestionJobRequest) -> IngestionJob:
-    return service.create(request.sources)
+    return service.create(
+        request.sources,
+        session_id=request.session_id,
+        turn_id=request.turn_id,
+    )
 
 
 @app.get("/ingestion/jobs/{job_id}", response_model=IngestionJob)

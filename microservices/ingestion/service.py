@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 from uuid import uuid4
 
 from .artifacts import ExtractionArtifact
 from .contracts import DocumentIngestionRequest, IngestionJob, IngestionResult
+from .events import emit_completed_job
 from .extraction import attach_canonical_claims, canonicalize_suppliers, extract_claims, extract_observed_suppliers, find_conflicts
 from .util import now
 from .vendors import ParserRouter
@@ -21,7 +23,14 @@ class JobService:
         self.router = router or ParserRouter()
         self.jobs: dict[str, StoredJob] = {}
 
-    def create(self, sources: list[DocumentIngestionRequest]) -> IngestionJob:
+    def create(
+        self,
+        sources: list[DocumentIngestionRequest],
+        *,
+        session_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> IngestionJob:
+        started = perf_counter()
         artifacts = [self.router.extract(source) for source in sources]
         observed = []
         claims = []
@@ -49,6 +58,13 @@ class JobService:
             error="; ".join(parser_errors) or None,
         )
         self.jobs[job.job_id] = StoredJob(job=job, artifacts=artifacts)
+        emit_completed_job(
+            job,
+            artifacts,
+            session_id=session_id,
+            turn_id=turn_id,
+            duration_ms=round((perf_counter() - started) * 1000),
+        )
         return job
 
     def get(self, job_id: str) -> IngestionJob | None:

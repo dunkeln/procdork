@@ -1,0 +1,32 @@
+select
+    dataset_version,
+    system_version,
+    treatment,
+    case_family,
+    count(*) as run_count,
+    avg((deterministic_result = 'pass')::integer) as deterministic_pass_rate,
+    sum((expected_behavior = 'abstain' and abstained)::integer)
+        / nullif(sum(abstained::integer), 0) as abstention_precision,
+    avg(semantic_score) as average_semantic_score,
+    stddev_samp(semantic_score) as semantic_score_stddev,
+    avg(grounding_score) as average_grounding_score,
+    avg(task_resolution_score) as average_task_resolution_score,
+    avg(uncertainty_calibration_score) as average_uncertainty_calibration_score,
+    avg(decision_usefulness_score) as average_decision_usefulness_score,
+    avg(clarity_score) as average_clarity_score,
+    quantile_cont(elapsed_ms, 0.5) as median_elapsed_ms,
+    quantile_cont(elapsed_ms, 0.95) as p95_elapsed_ms,
+    avg(tool_call_count) as average_tool_calls,
+    sum(tool_error_count) as tool_error_count,
+    sum(retry_count) as retry_count,
+    quantile_cont(max_tool_latency_ms, 0.95) as p95_max_tool_latency_ms,
+    sum(input_tokens) as input_tokens,
+    sum(cached_input_tokens) as cached_input_tokens,
+    sum(output_tokens) as output_tokens,
+    sum(output_tokens) / nullif(sum(input_tokens), 0) as output_to_input_ratio,
+    sum(cost_proxy_usd) as cost_proxy_usd,
+    avg(operator_interventions) as average_operator_interventions,
+    min(evaluated_at) as first_evaluated_at,
+    max(evaluated_at) as last_evaluated_at
+from {{ ref('mart_benchmark_runs') }}
+group by 1, 2, 3, 4

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable, Literal
 from urllib.parse import urlsplit
 
-from duckdb import StatementType
+from duckdb import DuckDBPyConnection, StatementType
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, Icon, TextContent, ToolAnnotations
 from starlette.requests import Request
@@ -33,7 +33,7 @@ load_dotenv_once()
 mcp = FastMCP(
     "procdork",
     instructions=(
-        "Use OKF resources for durable context and chart guidance. Analytics tools are read-only. "
+        "Use knowledge resources for durable context and chart guidance. Analytics tools are read-only. "
         "Query results return a Markdown table or an ephemeral chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),
@@ -120,6 +120,7 @@ def execute_readonly(
             )
 
         connection.execute("set enable_external_access = false")
+        install_table_aliases(connection)
         result = connection.execute(sql)
         columns = [column[0] for column in result.description or []]
         rows = result.fetchmany(row_limit + 1)
@@ -127,59 +128,83 @@ def execute_readonly(
 
 
 @mcp.tool(
-    title="List available marts",
+    title="List available tables",
     annotations=READ_ONLY,
     structured_output=True,
 )
-def list_marts() -> dict[str, object]:
-    """List stable analytics marts that are ready to query."""
-    columns, rows, truncated = execute_readonly(
-        """
-        select table_catalog, table_schema, table_name, table_type
-        from information_schema.tables
-        where table_name like 'mart_%'
-        order by table_catalog, table_schema, table_name
-        """
-    )
-    return {"columns": columns, "rows": rows, "truncated": truncated}
+def list_tables() -> dict[str, object]:
+    """List tables that are ready to query."""
+    with connect_duckdb() as connection:
+        rows = [[public_name] for public_name, *_ in published_tables(connection)]
+    return {"columns": ["table_name"], "rows": rows, "truncated": False}
 
 
 @mcp.tool(
-    title="Describe an analytics mart",
+    title="Describe a table",
     annotations=READ_ONLY,
     structured_output=True,
 )
-def describe_mart(mart_name: str) -> dict[str, object]:
-    """List the columns and types for one mart returned by list_marts."""
+def describe_table(table_name: str) -> dict[str, object]:
+    """List the columns and types for one table returned by list_tables."""
     with connect_duckdb() as connection:
         connection.execute("set enable_external_access = false")
+        matches = [
+            table for table in published_tables(connection) if table[0] == table_name
+        ]
+        if not matches:
+            raise ValueError(f"Unknown table: {table_name}")
+        _, catalog, schema, physical_name = matches[0]
         rows = connection.execute(
             """
-            select table_catalog, table_schema, table_name, column_name, data_type, is_nullable
+            select column_name, data_type, is_nullable
             from information_schema.columns
-            where table_name = ? and table_name like 'mart_%'
-            order by table_catalog, table_schema, ordinal_position
+            where table_catalog = ? and table_schema = ? and table_name = ?
+            order by ordinal_position
             """,
-            [mart_name],
+            [catalog, schema, physical_name],
         ).fetchall()
 
-    if not rows:
-        raise ValueError(f"Unknown mart: {mart_name}")
-
     return {
-        "columns": [
-            "table_catalog",
-            "table_schema",
-            "table_name",
-            "column_name",
-            "data_type",
-            "is_nullable",
-        ],
+        "table_name": table_name,
+        "columns": ["column_name", "data_type", "is_nullable"],
         "rows": [
             [str(value) if value is not None else None for value in row] for row in rows
         ],
         "truncated": False,
     }
+
+
+def published_tables(
+    connection: DuckDBPyConnection,
+) -> list[tuple[str, str, str, str]]:
+    rows = connection.execute(
+        """
+        select table_catalog, table_schema, table_name
+        from information_schema.tables
+        where table_name like 'mart_%'
+        order by table_catalog, table_schema, table_name
+        """
+    ).fetchall()
+    tables = [
+        (str(name).removeprefix("mart_"), str(catalog), str(schema), str(name))
+        for catalog, schema, name in rows
+    ]
+    names = [table[0] for table in tables]
+    if len(names) != len(set(names)):
+        raise RuntimeError("Published table names must be unique")
+    return tables
+
+
+def install_table_aliases(connection: DuckDBPyConnection) -> None:
+    for public_name, catalog, schema, physical_name in published_tables(connection):
+        connection.execute(
+            f"create or replace temp view {quoted(public_name)} as "
+            f"select * from {quoted(catalog)}.{quoted(schema)}.{quoted(physical_name)}"
+        )
+
+
+def quoted(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
 
 
 @mcp.custom_route("/health", methods=["GET"])

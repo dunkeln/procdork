@@ -16,3 +16,6 @@ dependencies = [
     "pyjwt[crypto]>=2.13.0",
     "workos>=9.1.0",
 ]
+
+[dependency-groups]
+benchmark = ["anthropic>=0.75.0"]

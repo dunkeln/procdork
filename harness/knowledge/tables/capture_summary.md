@@ -1,8 +1,8 @@
 ---
-type: dbt model
+type: Table
 title: Capture Summary
 description: Capture volume grouped by source type and extraction adapter.
-resource: ../../transforms/dbt/models/marts/mart_capture_summary.sql
+resource: procdork://tables/capture_summary
 tags: [harness, captures, transform]
 timestamp: 2026-07-10T00:00:00Z
 interpretations:
@@ -12,7 +12,7 @@ interpretations:
 
 # Meaning
 
-This model describes what the harness has captured, not the business entities
+This table describes what the harness has captured, not the business entities
 inside those captures.
 
 # Grain

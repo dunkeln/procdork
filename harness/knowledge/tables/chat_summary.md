@@ -1,8 +1,8 @@
 ---
-type: dbt model
+type: Table
 title: Chat Summary
 description: All-time counts for the chat snapshot currently loaded from Neon.
-resource: ../../transforms/dbt/models/marts/mart_chat_summary.sql
+resource: procdork://tables/chat_summary
 tags: [chat, neon, transform]
 timestamp: 2026-07-10T00:00:00Z
 interpretations:
@@ -11,7 +11,7 @@ interpretations:
 
 # Meaning
 
-This model summarizes the chat records currently loaded into the analytical
+This table summarizes the chat records currently loaded into the analytical
 database by `sync-neon-chat`.
 
 # Grain
@@ -26,7 +26,7 @@ Exactly one row for the full loaded snapshot.
 
 # Caveats
 
-The model has no time or tenant filter. Its values reflect the latest loaded
+The table has no time or tenant filter. Its values reflect the latest loaded
 snapshot, not necessarily the current source database.
 
 # Citations

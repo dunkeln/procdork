@@ -17,6 +17,8 @@ __pycache__/
 .ruff_cache/
 harness/data/
 harness/e2e/snapshots/
+harness/e2e/benchmarks/evidence/
+harness/e2e/benchmarks/charts/
 harness/transforms/dbt/logs/
 harness/transforms/dbt/target/
 

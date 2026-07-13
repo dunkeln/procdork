@@ -160,8 +160,46 @@ and are excluded from future seed-case selection.
 dbt publishes the latest case state in `mart_evaluation_cases`, the repair queue
 in `mart_evaluation_failures`, known-good anchors in
 `mart_evaluation_successes`, and pass-to-fail changes in
-`mart_evaluation_regressions`. These marts appear through the existing MCP mart
-tools without a new runtime surface.
+`mart_evaluation_regressions`. MCP exposes these internal models as tables
+without adding another runtime surface.
+
+## Defensible Benchmark
+
+The benchmark asks 20 glossary-grounded analytical questions across exact
+retrieval, comparison, freshness, evidence quality, knowledge application, and
+honest abstention. Each automated case runs three times through the normal
+harness and a raw read-only SQL baseline. A separate command times one human
+pass over the same cases. Its code, corpus, baseline server, judge connector,
+and generated evidence are isolated under `e2e/benchmarks/`.
+
+```bash
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-run \
+  --model <agent-model> --judge-model <anthropic-model> \
+  --dataset-version <data-version> --system-version <release-or-commit> \
+  --pricing-date <yyyy-mm-dd> \
+  --input-usd-per-million <rate> \
+  --cached-input-usd-per-million <rate> \
+  --output-usd-per-million <rate>
+
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-human \
+  --dataset-version <data-version> --system-version <release-or-commit>
+
+# Browser operators record agent-operated timing separately from human timing.
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-record-operator --help
+
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-calibrate \
+  --dataset-version <data-version> --system-version <release-or-commit>
+
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-charts
+
+uv run --group benchmark python -m e2e.benchmarks.cli benchmark-verify \
+  --dataset-version <data-version> --system-version <release-or-commit>
+```
+
+Deterministic checks and the pinned Anthropic judge write through the existing
+provider-neutral evaluation contract. Semantic scores are report-only. Dollar
+values are dated token-price proxies, not billing records. dbt publishes run,
+summary, comparison, and calibration tables through the existing MCP surface.
 
 ## What Gets Built
 
@@ -187,8 +225,12 @@ The harness serves an agent-agnostic MCP endpoint named `procdork` over HTTP.
 
 ```text
 resources: reviewed OKF context
-tools:     mart discovery, mart description, and bounded read-only SQL
+tools:     table discovery, table description, and bounded read-only SQL
 ```
+
+The MCP vocabulary stays role-neutral: tables, queries, results, charts, and
+knowledge. Internal dbt model names are exposed as plain table names so clients
+do not need pipeline-engineering language to ask analytical questions.
 
 The server uses DuckDB's parser to accept one `SELECT`, `DESCRIBE`, `SHOW`, or `EXPLAIN` statement, disables external access, and caps returned rows. Any MCP client can connect to the same `/mcp` endpoint without repository-specific client configuration.
 

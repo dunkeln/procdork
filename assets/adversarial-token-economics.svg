@@ -1,0 +1,59 @@
+<svg viewBox="0 0 860 370" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+  <title id="title">Token economics under adversarial data readiness</title>
+  <desc id="desc">Median fresh input was 25,523 tokens, median output was 1,305 tokens, median billable proxy was 27,100 tokens, and p95 billable proxy was 43,995 tokens. Across all workflows, 90.1 percent of input tokens were cached.</desc>
+  <defs>
+    <clipPath id="median-proxy-bar"><rect x="472" y="148" width="72" height="108" rx="3"/></clipPath>
+    <clipPath id="p95-proxy-bar"><rect x="644" y="80" width="72" height="176" rx="3"/></clipPath>
+  </defs>
+  <text x="20" y="28" font-size="15" font-weight="600" fill="#ffffff">Token economics under adversarial data readiness.</text>
+  <text x="20" y="48" font-size="12" fill="#ffffff" opacity="0.85">Cumulative usage per completed operator workflow. Lower is leaner.</text>
+  <rect x="650" y="39" width="10" height="10" rx="2" fill="#b8b8ff"/>
+  <text x="666" y="48" font-size="11" fill="#b8b8ff">fresh input</text>
+  <rect x="746" y="39" width="10" height="10" rx="2" fill="#ce4257"/>
+  <text x="762" y="48" font-size="11" fill="#b8b8ff">output</text>
+
+  <line x1="82" y1="76" x2="820" y2="76" stroke="#b8b8ff" stroke-opacity="0.18" stroke-dasharray="4 4"/>
+  <text x="70" y="80" font-size="11" fill="#b8b8ff" text-anchor="end">45K</text>
+  <line x1="82" y1="166" x2="820" y2="166" stroke="#b8b8ff" stroke-opacity="0.14"/>
+  <text x="70" y="170" font-size="11" fill="#b8b8ff" text-anchor="end">22.5K</text>
+  <line x1="82" y1="256" x2="820" y2="256" stroke="#b8b8ff" stroke-opacity="0.24"/>
+  <text x="70" y="260" font-size="11" fill="#b8b8ff" text-anchor="end">0</text>
+
+  <g>
+    <rect x="128" y="154" width="72" height="102" rx="3" fill="#b8b8ff"/>
+    <text x="164" y="145" font-size="12" font-weight="600" fill="#b8b8ff" text-anchor="middle">25.5K</text>
+    <text x="164" y="279" font-size="12" fill="#b8b8ff" text-anchor="middle">median fresh</text>
+    <text x="164" y="295" font-size="12" fill="#b8b8ff" text-anchor="middle">input</text>
+  </g>
+
+  <g>
+    <rect x="300" y="251" width="72" height="5" rx="3" fill="#ce4257"/>
+    <text x="336" y="242" font-size="12" font-weight="600" fill="#ce4257" text-anchor="middle">1.3K</text>
+    <text x="336" y="279" font-size="12" fill="#b8b8ff" text-anchor="middle">median</text>
+    <text x="336" y="295" font-size="12" fill="#b8b8ff" text-anchor="middle">output</text>
+  </g>
+
+  <g>
+    <g clip-path="url(#median-proxy-bar)">
+      <rect x="472" y="154" width="72" height="102" fill="#b8b8ff"/>
+      <rect x="472" y="148" width="72" height="6" fill="#ce4257"/>
+    </g>
+    <text x="508" y="139" font-size="12" font-weight="600" fill="#ce4257" text-anchor="middle">27.1K</text>
+    <text x="508" y="279" font-size="12" fill="#b8b8ff" text-anchor="middle">median billable</text>
+    <text x="508" y="295" font-size="12" fill="#b8b8ff" text-anchor="middle">proxy</text>
+    <text x="508" y="312" font-size="10" fill="#b8b8ff" text-anchor="middle">25.5K + 1.6K</text>
+  </g>
+
+  <g>
+    <g clip-path="url(#p95-proxy-bar)">
+      <rect x="644" y="107" width="72" height="149" fill="#b8b8ff"/>
+      <rect x="644" y="80" width="72" height="27" fill="#ce4257"/>
+    </g>
+    <text x="680" y="71" font-size="12" font-weight="600" fill="#ce4257" text-anchor="middle">44.0K</text>
+    <text x="680" y="279" font-size="12" fill="#b8b8ff" text-anchor="middle">p95 billable</text>
+    <text x="680" y="295" font-size="12" fill="#b8b8ff" text-anchor="middle">proxy</text>
+    <text x="680" y="312" font-size="10" fill="#b8b8ff" text-anchor="middle">37.3K + 6.7K</text>
+  </g>
+
+  <text x="82" y="347" font-size="11" fill="#b8b8ff">24 completed workflows. 90.1% of cumulative input was cached. Billable proxy = fresh input + output, not a dollar invoice.</text>
+</svg>

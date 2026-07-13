@@ -15,9 +15,9 @@ run() {
         >"$output/$name.events.jsonl"
 }
 
-run table 'Use only the procdork MCP. Find the available chat summary mart, then return its exact snapshot counts as a table. Preserve the procdork table and key facts verbatim. Do not inspect local files.'
+run table 'Use only the procdork MCP. Find the available chat summary table, then return its exact snapshot counts as a table. Preserve the procdork table and key facts verbatim. Do not inspect local files.'
 
-run chart 'Use only the procdork MCP. Find and describe the available chat summary mart, then use a read-only query to return a bar chart comparing its count metrics. Preserve the procdork chart Markdown and key facts verbatim. Do not inspect local files.'
+run chart 'Use only the procdork MCP. Find and describe the available chat summary table, then use a read-only query to return a bar chart comparing its count metrics. Preserve the procdork chart Markdown and key facts verbatim. Do not inspect local files.'
 
 chart_url=$(rg -o 'https://procdork\.vercel\.app/charts/[^"\\ ]+\.svg' "$output/chart.events.jsonl" | head -n 1)
 test -n "$chart_url"

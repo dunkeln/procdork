@@ -8,10 +8,15 @@ from pathlib import Path
 import click
 
 from connectors.neon import sync_neon_chat
+from connectors.ingestion import sync_ingestion_events
 from connectors.procdork import chat_dataset_version, load_chat_cases, replay_chat
 from connectors.sources import read_url_or_file
 from connectors.storage import append_jsonl, write_local_blob
-from evaluations import ensure_evaluation_table, latest_result, record_evaluation
+from evaluations import (
+    ensure_evaluation_table,
+    latest_result,
+    record_evaluation,
+)
 from evaluators.inline_citations import NAME as EVALUATOR_NAME
 from evaluators.inline_citations import evaluate
 from extraction import extract_source
@@ -67,6 +72,28 @@ def sync_neon_chat_command(duckdb_path: str | None) -> None:
         load_dotenv_once()
         with connect_duckdb(duckdb_path) as connection:
             result = sync_neon_chat(connection, os.environ.get("DATABASE_URL", ""))
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(result.model_dump_json(indent=2))
+
+
+@main.command("sync-ingestion-events")
+@click.option(
+    "--event-jsonl",
+    type=click.Path(path_type=Path, dir_okay=False, readable=True),
+    required=True,
+    help="Append-only JSONL stream emitted by the ingestion service.",
+)
+@click.option(
+    "--duckdb-path",
+    default=None,
+    help="DuckDB/MotherDuck path. Defaults to DUCKDB_PATH or local data/harness.duckdb.",
+)
+def sync_ingestion_events_command(event_jsonl: Path, duckdb_path: str | None) -> None:
+    """Load durable document-ingestion completion events into the harness."""
+    try:
+        with connect_duckdb(duckdb_path) as connection:
+            result = sync_ingestion_events(connection, event_jsonl)
     except (OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(result.model_dump_json(indent=2))
@@ -159,6 +186,7 @@ def eval_replay(
     click.echo(
         json.dumps({"dataset_version": dataset_version, "cases": results}, indent=2)
     )
+
 
 
 @main.command("serve-mcp")

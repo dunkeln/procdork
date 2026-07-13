@@ -53,15 +53,11 @@ def record_evaluation(
         con.execute(
             """
             delete from raw_evaluation_results
-            where case_id = ? and dataset_version = ? and system_version = ?
-              and evaluator_name = ? and evaluator_version = ?
+            where run_id = ? and evaluator_name = ?
             """,
             [
-                evaluation.case_id,
-                evaluation.dataset_version,
-                evaluation.system_version,
+                evaluation.run_id,
                 evaluation.evaluator_name,
-                evaluation.evaluator_version,
             ],
         )
         con.execute(

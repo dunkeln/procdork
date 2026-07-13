@@ -3,9 +3,13 @@
 This bundle contains reviewed, durable context for people and agents using the
 procdork harness. Live values remain behind MCP tools and MotherDuck.
 
-## Analytical Models
+## Analytical Tables
 
-* [Models](models/) - Grain, measures, and interpretation for reviewed analytical models.
+* [Tables](tables/) - Grain, measures, and interpretation for reviewed analytical tables.
+
+## Source Events
+
+* [Document Ingestion Events](ingestion-events.md) - The source-backed completion event contract that feeds supplier intelligence.
 
 ## Authoring Boundary
 

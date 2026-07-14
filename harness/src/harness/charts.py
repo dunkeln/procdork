@@ -4,8 +4,11 @@ from base64 import urlsafe_b64encode
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
+from io import BytesIO
 from math import isfinite
 import os
+from pathlib import Path
+from tempfile import gettempdir
 from typing import Literal
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -29,6 +32,26 @@ from pydantic import BaseModel
 
 ChartKind = Literal["auto", "line", "bar", "heatmap", "table"]
 CHART_TTL_SECONDS = 15 * 60
+
+
+def configure_chart_fonts() -> None:
+    if "FONTCONFIG_FILE" in os.environ:
+        return
+    font_directory = Path(__file__).parent / "fonts"
+    config = Path(gettempdir()) / "procdork-fonts.conf"
+    config.write_text(
+        '<?xml version="1.0"?>\n'
+        '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
+        "<fontconfig>\n"
+        f"  <dir>{font_directory}</dir>\n"
+        f"  <cachedir>{Path(gettempdir()) / 'procdork-font-cache'}</cachedir>\n"
+        "</fontconfig>\n",
+        encoding="utf-8",
+    )
+    os.environ["FONTCONFIG_FILE"] = str(config)
+
+
+configure_chart_fonts()
 
 
 class ChartPayload(BaseModel):
@@ -183,9 +206,9 @@ def decode_chart(token: str) -> ChartPayload:
         raise ValueError("Chart link is invalid or expired") from error
 
 
-def render_svg(payload: ChartPayload) -> str:
+def render_png(payload: ChartPayload) -> bytes:
     if payload.chart_kind == "table":
-        raise ValueError("Tables render as Markdown, not SVG")
+        raise ValueError("Tables render as Markdown, not PNG")
 
     segmented = len(payload.columns) == 3
     data = {
@@ -203,38 +226,41 @@ def render_svg(payload: ChartPayload) -> str:
             y=payload.columns[1],
             fill=payload.columns[2],
         )
-        return themed(plot).to_svg(w=960, h=540, unit="px")
-
-    colors = segment_palette(len(set(data["series"])))
-    plot = ggplot(data, aes("label", "value", group="series"))
-    if payload.chart_kind == "line":
-        plot += (
-            geom_line(aes(color="series"), size=1.2)
-            + geom_point(aes(color="series"), size=4)
-            + scale_color_manual(values=colors)
-            if segmented
-            else geom_line(color="#b8b8ff", size=1.2)
-            + geom_point(color="#b8b8ff", size=4)
-        )
     else:
-        plot += (
-            geom_bar(aes(fill="series"), stat="identity", width=0.65)
-            + scale_fill_manual(values=colors)
-            if segmented
-            else geom_bar(stat="identity", fill="#b8b8ff", width=0.65)
+        colors = segment_palette(len(set(data["series"])))
+        plot = ggplot(data, aes("label", "value", group="series"))
+        if payload.chart_kind == "line":
+            plot += (
+                geom_line(aes(color="series"), size=1.2)
+                + geom_point(aes(color="series"), size=4)
+                + scale_color_manual(values=colors)
+                if segmented
+                else geom_line(color="#b8b8ff", size=1.2)
+                + geom_point(color="#b8b8ff", size=4)
+            )
+        else:
+            plot += (
+                geom_bar(aes(fill="series"), stat="identity", width=0.65)
+                + scale_fill_manual(values=colors)
+                if segmented
+                else geom_bar(stat="identity", fill="#b8b8ff", width=0.65)
+            )
+        plot += labs(
+            title=payload.title,
+            x=payload.columns[0],
+            y=payload.columns[-1],
+            color=payload.columns[1],
+            fill=payload.columns[1],
         )
-    plot += labs(
-        title=payload.title,
-        x=payload.columns[0],
-        y=payload.columns[-1],
-        color=payload.columns[1],
-        fill=payload.columns[1],
-    )
-    return themed(plot).to_svg(w=960, h=540, unit="px")
+
+    image = BytesIO()
+    themed(plot).to_png(image, w=960, h=540, unit="px")
+    return image.getvalue()
 
 
 def themed(plot):
     return plot + theme(
+        text=element_text(family="Roboto"),
         axis_text_x=element_text(angle=30, hjust=1),
         legend_position="bottom",
         panel_background=element_rect(fill="#ffffff"),

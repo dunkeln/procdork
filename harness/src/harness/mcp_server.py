@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from base64 import b64encode
 import os
 from pathlib import Path
 from typing import Callable, Literal
@@ -7,7 +8,14 @@ from urllib.parse import urlsplit
 
 from duckdb import DuckDBPyConnection, StatementType
 from mcp.server.fastmcp import FastMCP
-from mcp.types import Annotations, CallToolResult, Icon, TextContent, ToolAnnotations
+from mcp.types import (
+    Annotations,
+    CallToolResult,
+    Icon,
+    ImageContent,
+    TextContent,
+    ToolAnnotations,
+)
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 
@@ -16,7 +24,7 @@ from .charts import (
     decode_chart,
     encode_chart,
     render_markdown_table,
-    render_svg,
+    render_png,
 )
 from .connectors.workos import workos_auth
 from .olap import connect_duckdb, load_dotenv_once
@@ -118,14 +126,25 @@ def query(
         result = render_markdown_table(payload)
     else:
         token, expires_at = encode_chart(payload)
-        chart_url = f"{public_origin()}/charts/{token}.svg"
+        chart_url = f"{public_origin()}/charts/{token}.png"
         result = f"![{payload.title}]({chart_url})"
         structured.update(chart_url=chart_url, expires_at=expires_at)
     markdown = "\n".join(
         [payload.title, "", result, "", *(f"- {fact}" for fact in payload.key_facts)]
     )
+    if payload.chart_kind == "table":
+        content = [TextContent(type="text", text=markdown)]
+    else:
+        content = [
+            TextContent(type="text", text=markdown),
+            ImageContent(
+                type="image",
+                data=b64encode(render_png(payload)).decode(),
+                mimeType="image/png",
+            ),
+        ]
     return CallToolResult(
-        content=[TextContent(type="text", text=markdown)],
+        content=content,
         structuredContent=structured,
     )
 
@@ -236,20 +255,19 @@ async def health(_: Request) -> PlainTextResponse:
     return PlainTextResponse("ok")
 
 
-@mcp.custom_route("/charts/{token}.svg", methods=["GET"])
+@mcp.custom_route("/charts/{token}.png", methods=["GET"])
 async def chart(request: Request) -> Response:
     try:
         payload = decode_chart(request.path_params["token"])
-        svg = render_svg(payload)
+        png = render_png(payload)
     except ValueError as error:
         return PlainTextResponse(str(error), status_code=404)
     return Response(
-        svg,
-        media_type="image/svg+xml",
+        png,
+        media_type="image/png",
         headers={
             "Cache-Control": "private, max-age=300",
             "Content-Disposition": "inline",
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
             "X-Content-Type-Options": "nosniff",
         },
     )

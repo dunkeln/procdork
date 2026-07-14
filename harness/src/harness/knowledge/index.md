@@ -7,6 +7,35 @@ procdork harness. Live values remain behind MCP tools and MotherDuck.
 
 * [Tables](tables/) - Grain, measures, and interpretation for reviewed analytical tables.
 
+## Use Case Routing
+
+Choose the table by decision type before writing SQL.
+
+* Executive decisions: start with [Source Reach](tables/source_reach.md),
+  [Supplier Coverage](tables/supplier_coverage.md), or
+  [Benchmark Summary](tables/benchmark_summary.md). Use bars or heatmaps for
+  breadth, concentration, and treatment tradeoffs. Do not use these as approval,
+  vendor ranking, or release-gate scorecards without the caveats from each table.
+* App health: start with [Workflow Sessions](tables/workflow_sessions.md),
+  [Tool Activity](tables/tool_activity.md), and
+  [App Message Judge Drift](tables/app_message_judge_drift.md). Use histograms
+  for duration tails, heatmaps for tool/status concentration, and lines for
+  judged quality movement over time.
+* Evidence coverage: start with [Source Reach](tables/source_reach.md),
+  [Chat Summary](tables/chat_summary.md), and
+  [Document Intelligence](tables/document_intelligence.md). Use these to show
+  observed source scale and evidence mix before discussing structured extraction.
+* Supplier intelligence: start with [Supplier Coverage](tables/supplier_coverage.md),
+  then [Supplier Claims](tables/supplier_claims.md) or
+  [Supplier Intelligence](tables/supplier_intelligence.md) only when structured
+  supplier rows exist. Use heatmaps for `supplier_name` by `claim_field`; explain
+  thin coverage and conflicts before any supplier comparison.
+* Benchmark tradeoffs: start with [Benchmark Summary](tables/benchmark_summary.md),
+  [Benchmark Runs](tables/benchmark_runs.md), and
+  [Benchmark Calibration](tables/benchmark_calibration.md). Use scatter or bubble
+  plots for speed/quality/cost tradeoffs, grouped box plots for latency spread,
+  and calibration views before trusting semantic scores.
+
 ## Query Order
 
 Prefer chartable summaries before plain tables. Look for categorical dimensions,

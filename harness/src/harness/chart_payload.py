@@ -123,6 +123,8 @@ def choose_chart_kind(
 ) -> Literal["line", "bar", "heatmap", "scatter", "bubble", "histogram", "box", "table"]:
     if requested != "auto":
         return requested
+    if len(columns) == 1 and numeric_column(rows, start=0) is not None:
+        return "histogram"
     if len(columns) < 2 or numeric_column(rows) is None:
         return "table"
     first_value = next((row[0] for row in rows if row and row[0] is not None), None)

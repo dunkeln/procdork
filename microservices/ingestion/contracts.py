@@ -98,6 +98,31 @@ class IngestionResult(ContractModel):
     conflicts: list[SupplierConflict]
 
 
+class ArtifactSummary(ContractModel):
+    source_id: str
+    parsers_attempted: list[str]
+    block_count: int
+    errors: list[str]
+
+
+class IngestionEvent(ContractModel):
+    event_id: str
+    event_type: str = "ingestion.job.completed"
+    schema_version: str = "1"
+    emitted_at: datetime
+    job_id: str
+    session_id: str | None = None
+    turn_id: str | None = None
+    status: JobStatus
+    duration_ms: int
+    sources: list[DocumentIngestionRequest]
+    observed_suppliers: list[ObservedSupplier]
+    canonical_suppliers: list[CanonicalSupplier]
+    source_claims: list[SourceClaim]
+    conflicts: list[SupplierConflict]
+    artifacts: list[ArtifactSummary]
+
+
 class IngestionJob(ContractModel):
     job_id: str
     status: JobStatus
@@ -106,3 +131,4 @@ class IngestionJob(ContractModel):
     result: IngestionResult
     updated_at: datetime | None = None
     error: str | None = None
+    event: IngestionEvent | None = None

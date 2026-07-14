@@ -1,10 +1,7 @@
-import { loadDotenv } from '$lib/server/env';
-import { neon } from '@neondatabase/serverless';
-import schemaSql from './schema.sql?raw';
+import { database, ensureStorageSchema } from './database';
 import type { ChatCitation } from '$lib/server/tinyfish/procurement-tools';
 import type { MessageParam } from '@anthropic-ai/sdk/resources/messages';
 
-type Db = ReturnType<typeof neon>;
 const PROMPT_HISTORY_LIMIT = 10;
 
 export type StoredChatMessage = {
@@ -24,16 +21,8 @@ export type StoredChatSession = {
 	messageCount: number;
 };
 
-let db: Db | undefined;
-let init: Promise<void> | undefined;
-
 function sql() {
-	loadDotenv();
-	const databaseUrl = process.env.DATABASE_URL;
-	if (!databaseUrl) throw new Error('DATABASE_URL is not configured.');
-
-	db ??= neon(databaseUrl);
-	return db;
+	return database();
 }
 
 function normalizeSlug(slug: string) {
@@ -46,16 +35,7 @@ function titleFromMessage(message: string) {
 }
 
 export async function ensureChatSchema() {
-	const client = sql();
-	init ??= (async () => {
-		for (const statement of schemaSql
-			.split(/;\s*\n/)
-			.map((item) => item.trim())
-			.filter(Boolean)) {
-			await client.query(statement);
-		}
-	})();
-	return init;
+	return ensureStorageSchema();
 }
 
 export async function createChatSession(title?: string) {

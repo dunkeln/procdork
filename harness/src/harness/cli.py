@@ -68,7 +68,7 @@ def extract(
     help="DuckDB/MotherDuck path. Defaults to DUCKDB_PATH or local data/harness.duckdb.",
 )
 def sync_neon_chat_command(duckdb_path: str | None) -> None:
-    """Copy demo chat tables from Neon into the harness OLAP database."""
+    """Copy durable application sources from Neon into the harness OLAP database."""
     try:
         load_dotenv_once()
         with connect_duckdb(duckdb_path) as connection:

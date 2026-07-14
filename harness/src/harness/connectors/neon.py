@@ -5,13 +5,15 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import duckdb
 
 from ..extraction import HarnessModel
+from .ingestion import ensure_raw_ingestion_events
 
 
 CHAT_TABLES = ["sessions", "messages", "message_events", "sources", "message_sources"]
+INGESTION_TABLE = "ingestion_events"
 
 
 class NeonSyncResult(HarnessModel):
-    source: str = "neon_chat"
+    source: str = "neon"
     tables: dict[str, int]
 
 
@@ -29,6 +31,12 @@ def sync_neon_chat(
         f"attach {sql_literal(url)} as neon_src (type postgres, read_only)"
     )
     try:
+        source_tables = {
+            str(row[0])
+            for row in connection.execute(
+                "select table_name from neon_src.information_schema.tables where table_schema = 'public'"
+            ).fetchall()
+        }
         connection.execute("begin transaction")
         try:
             for table in CHAT_TABLES:
@@ -39,6 +47,15 @@ def sync_neon_chat(
                 tables[target] = connection.execute(
                     f"select count(*) from {target}"
                 ).fetchone()[0]
+            if INGESTION_TABLE in source_tables:
+                connection.execute(
+                    f"create or replace table raw_ingestion_events as select * from neon_src.public.{INGESTION_TABLE}"
+                )
+            else:
+                ensure_raw_ingestion_events(connection)
+            tables["raw_ingestion_events"] = connection.execute(
+                "select count(*) from raw_ingestion_events"
+            ).fetchone()[0]
             connection.execute("commit")
         except Exception:
             connection.execute("rollback")

@@ -44,7 +44,7 @@ jobs:
             --source-results '{}' \
             --transform-status pending
       - id: sync_neon
-        name: Sync Neon chat
+        name: Sync Neon sources
         continue-on-error: true
         run: uv run harness sync-neon-chat
       - id: dbt
@@ -54,7 +54,8 @@ jobs:
           uv run dbt build \
             --project-dir transforms/dbt \
             --profiles-dir "$RUNNER_TEMP/dbt-profiles" \
-            --target motherduck
+            --target motherduck \
+            --exclude source:harness.raw_manifest+
       - id: classify
         name: Record refresh outcome
         env:
@@ -73,7 +74,7 @@ jobs:
             --run-id "$REFRESH_RUN_ID" \
             --status "$status" \
             --revision "$GITHUB_SHA" \
-            --source-results "{\"neon_chat\":\"$SOURCE_OUTCOME\"}" \
+            --source-results "{\"neon_sources\":\"$SOURCE_OUTCOME\"}" \
             --transform-status "$TRANSFORM_OUTCOME" \
             > "$RUNNER_TEMP/refresh-receipt.json"
 
@@ -83,7 +84,7 @@ jobs:
             echo
             echo "| Stage | Outcome |"
             echo "| --- | --- |"
-            echo "| Neon chat | $SOURCE_OUTCOME |"
+            echo "| Neon sources | $SOURCE_OUTCOME |"
             echo "| dbt build | $TRANSFORM_OUTCOME |"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve refresh evidence

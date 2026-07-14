@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from .artifacts import ExtractionArtifact
 from .contracts import DocumentIngestionRequest, IngestionJob, IngestionResult
-from .events import emit_completed_job
+from .events import completed_job_event, emit_completed_job
 from .extraction import attach_canonical_claims, canonicalize_suppliers, extract_claims, extract_observed_suppliers, find_conflicts
 from .util import now
 from .vendors import ParserRouter
@@ -57,14 +57,16 @@ class JobService:
             result=result,
             error="; ".join(parser_errors) or None,
         )
-        self.jobs[job.job_id] = StoredJob(job=job, artifacts=artifacts)
-        emit_completed_job(
+        event = completed_job_event(
             job,
             artifacts,
             session_id=session_id,
             turn_id=turn_id,
             duration_ms=round((perf_counter() - started) * 1000),
         )
+        job = job.model_copy(update={"event": event})
+        self.jobs[job.job_id] = StoredJob(job=job, artifacts=artifacts)
+        emit_completed_job(event)
         return job
 
     def get(self, job_id: str) -> IngestionJob | None:

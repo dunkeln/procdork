@@ -2,18 +2,13 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .contracts import (
-    CanonicalSupplier,
-    ContractModel,
-    DocumentIngestionRequest,
+    ArtifactSummary,
     IngestionJob,
-    ObservedSupplier,
-    SourceClaim,
-    SupplierConflict,
+    IngestionEvent,
 )
 from .util import now
 
@@ -21,44 +16,15 @@ if TYPE_CHECKING:
     from .artifacts import ExtractionArtifact
 
 
-class ArtifactSummary(ContractModel):
-    source_id: str
-    parsers_attempted: list[str]
-    block_count: int
-    errors: list[str]
-
-
-class IngestionEvent(ContractModel):
-    event_id: str
-    event_type: str = "ingestion.job.completed"
-    schema_version: str = "1"
-    emitted_at: datetime
-    job_id: str
-    session_id: str | None = None
-    turn_id: str | None = None
-    status: str
-    duration_ms: int
-    sources: list[DocumentIngestionRequest]
-    observed_suppliers: list[ObservedSupplier]
-    canonical_suppliers: list[CanonicalSupplier]
-    source_claims: list[SourceClaim]
-    conflicts: list[SupplierConflict]
-    artifacts: list[ArtifactSummary]
-
-
-def emit_completed_job(
+def completed_job_event(
     job: IngestionJob,
     artifacts: list[ExtractionArtifact],
     *,
     session_id: str | None,
     turn_id: str | None,
     duration_ms: int,
-) -> None:
-    path = os.environ.get("INGESTION_EVENT_JSONL")
-    if not path:
-        return
-
-    event = IngestionEvent(
+) -> IngestionEvent:
+    return IngestionEvent(
         event_id=f"evt_{job.job_id}",
         job_id=job.job_id,
         session_id=session_id,
@@ -81,6 +47,13 @@ def emit_completed_job(
             for artifact in artifacts
         ],
     )
+
+
+def emit_completed_job(event: IngestionEvent) -> None:
+    path = os.environ.get("INGESTION_EVENT_JSONL")
+    if not path:
+        return
+
     # ponytail: local JSONL assumes one service writer; use object storage or a queue if concurrent writers appear.
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)

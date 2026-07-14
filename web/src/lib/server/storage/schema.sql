@@ -49,7 +49,21 @@ create table if not exists message_sources (
 	primary key (message_id, source_url)
 );
 
+create table if not exists ingestion_events (
+	event_id text primary key,
+	event_type text not null,
+	schema_version text not null,
+	emitted_at timestamptz not null,
+	job_id text not null,
+	session_id text null,
+	turn_id text null,
+	status text not null,
+	duration_ms bigint not null,
+	payload jsonb not null
+);
+
 create index if not exists messages_session_created_idx on messages (session_slug, created_at desc);
 create index if not exists message_events_session_created_idx on message_events (session_slug, created_at);
 create index if not exists message_sources_message_position_idx on message_sources (message_id, position);
 create index if not exists sessions_updated_idx on sessions (updated_at desc);
+create index if not exists ingestion_events_emitted_idx on ingestion_events (emitted_at desc);

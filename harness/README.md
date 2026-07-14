@@ -92,7 +92,7 @@ extraction or loading boundary instead of teaching the core about a vendor.
 ```bash
 uv run harness extract <url-or-path>
 uv run harness sync-neon-chat
-uv run harness sync-ingestion-events <events.jsonl>
+uv run harness sync-ingestion-events --event-jsonl events.jsonl
 ```
 
 ### Publish an analysis

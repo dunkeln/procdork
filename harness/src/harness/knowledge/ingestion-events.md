@@ -15,15 +15,18 @@ and the session or turn that caused the work.
 
 # Delivery
 
-Set `INGESTION_EVENT_JSONL` on the ingestion service to append one event after
-each job. An external runner loads the stream with:
+The ingestion service returns its exact completion event to the calling web
+service. The web service stores it in Neon, and the scheduled `sync-neon-chat`
+command merges it into `raw_ingestion_events` before dbt runs.
+
+For a local single-process setup, `INGESTION_EVENT_JSONL` remains an optional
+backup. Load that stream with:
 
 ```sh
 uv run harness sync-ingestion-events --event-jsonl /shared/ingestion-events.jsonl
 ```
 
-The loader is idempotent by `event_id`; rerunning the same file does not create
-duplicate rows.
+Both paths are idempotent by `event_id`.
 
 # Evidence Boundary
 
@@ -41,7 +44,6 @@ duplicate rows.
 
 # Caveats
 
-The current service keeps job lookup state in memory. The emitted event is the
+The current service keeps job lookup state in memory. The Neon event is the
 durable analytical handoff, not a replacement for a future durable job API.
-The local JSONL sink assumes one service writer; use a shared object or queue
-transport when concurrent service writers are required.
+The optional local JSONL sink assumes one service writer.

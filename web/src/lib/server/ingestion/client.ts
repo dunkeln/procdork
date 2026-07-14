@@ -2,19 +2,25 @@ import { loadDotenv } from '$lib/server/env';
 import { createHash } from 'node:crypto';
 import { documentIngestionRequestSchema } from '$lib/contracts/supplier-entity';
 import type { ArtifactType, DocumentIngestionRequest } from '$lib/contracts/supplier-entity';
+import { saveIngestionEvent, type DurableIngestionEvent } from '$lib/server/storage/ingestion';
 
 type IngestionJob = {
 	job_id: string;
 	status: 'queued' | 'running' | 'succeeded' | 'failed' | 'partial';
 	result?: unknown;
 	error?: string | null;
+	event?: DurableIngestionEvent | null;
 };
 
 const INGESTION_TIMEOUT_MS = 45_000;
 
 export function getIngestionServiceUrl() {
 	loadDotenv();
-	return process.env.INGESTION_SERVICE_URL ?? process.env.DOCUMENT_INGESTION_URL ?? process.env.INGESTION_URL;
+	return (
+		process.env.INGESTION_SERVICE_URL ??
+		process.env.DOCUMENT_INGESTION_URL ??
+		process.env.INGESTION_URL
+	);
 }
 
 function ingestionUrl(path: string, serviceUrl: string) {
@@ -84,7 +90,10 @@ export async function createIngestionJob(input: {
 			);
 		}
 
-		return data as IngestionJob;
+		const job = data as IngestionJob;
+		if (!job.event) throw new Error('Document ingestion returned no durable completion event.');
+		await saveIngestionEvent(job.event);
+		return job;
 	} finally {
 		clearTimeout(timeout);
 	}

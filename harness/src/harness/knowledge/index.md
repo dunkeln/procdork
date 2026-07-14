@@ -11,6 +11,9 @@ procdork harness. Live values remain behind MCP tools and MotherDuck.
 
 Prefer chartable summaries before plain tables. Look for categorical dimensions,
 numeric measures, and `*_bucket` time labels before returning row-level output.
+Do not run separate count-table probes when one chart-ready aggregate can answer
+the question. Use table docs for planning, then make the first query the chart
+or final inspection table.
 Use raw timestamp columns for filtering and freshness checks, but use the
 15-minute bucket columns for chart axes. Public mart ids are short stable hashes;
 do not infer business meaning from them.

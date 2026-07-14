@@ -43,7 +43,8 @@ mcp = FastMCP(
         "before table discovery or querying. "
         "Analytics tools are read-only. "
         "Prefer chartable summaries: find categorical dimensions, numeric measures, and *_bucket time labels before "
-        "falling back to plain table output. "
+        "falling back to plain table output. Avoid exploratory query calls that only render row counts or schema "
+        "checks; use knowledge and describe_table for planning, then issue one chart-ready query. "
         "Query results return a Markdown table or an MCP App chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),

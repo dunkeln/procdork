@@ -27,6 +27,8 @@ select
     sum(cost_proxy_usd) as cost_proxy_usd,
     avg(operator_interventions) as average_operator_interventions,
     min(evaluated_at) as first_evaluated_at,
-    max(evaluated_at) as last_evaluated_at
+    max(evaluated_at) as last_evaluated_at,
+    {{ chart_time('min(evaluated_at)') }} as first_evaluated_at_bucket,
+    {{ chart_time('max(evaluated_at)') }} as last_evaluated_at_bucket
 from {{ ref('mart_benchmark_runs') }}
 group by 1, 2, 3, 4

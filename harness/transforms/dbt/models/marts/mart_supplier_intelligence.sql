@@ -39,7 +39,7 @@ conflict_metrics as (
 )
 
 select
-    supplier.canonical_supplier_id,
+    {{ chart_id('supplier.canonical_supplier_id', 'sup') }} as canonical_supplier_id,
     supplier.supplier_name,
     supplier.supplier_confidence,
     supplier.observed_supplier_count,
@@ -57,8 +57,11 @@ select
     coalesce(conflict.open_conflict_count, 0) as open_conflict_count,
     claim.latest_evidence_url,
     claim.latest_evidence_at,
+    {{ chart_time('claim.latest_evidence_at') }} as latest_evidence_at_bucket,
     supplier.first_seen_at,
-    supplier.last_seen_at
+    supplier.last_seen_at,
+    {{ chart_time('supplier.first_seen_at') }} as first_seen_at_bucket,
+    {{ chart_time('supplier.last_seen_at') }} as last_seen_at_bucket
 from supplier_events as supplier
 left join claim_metrics as claim using (canonical_supplier_id)
 left join conflict_metrics as conflict using (canonical_supplier_id)

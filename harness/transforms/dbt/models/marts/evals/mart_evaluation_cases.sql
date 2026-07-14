@@ -21,8 +21,8 @@ with ranked as (
 )
 
 select
-    run_id,
-    case_id,
+    {{ chart_id('run_id', 'run') }} as run_id,
+    {{ chart_id('case_id', 'case') }} as case_id,
     dataset_version,
     system_version,
     evaluator_name,
@@ -40,6 +40,7 @@ select
     end as comparison,
     evidence_uri,
     metadata,
-    evaluated_at
+    evaluated_at,
+    {{ chart_time('evaluated_at') }} as evaluated_at_bucket
 from ranked
 where evaluation_order = 1

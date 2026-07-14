@@ -7,10 +7,10 @@ from .contracts import CanonicalSupplier, ObservedSupplier, SourceClaim, SourceR
 from .util import canonical_name, clean_value, now, stable_id
 
 PROCUREMENT_FIELDS = {
-    "moq": re.compile(r"\b(?:moq|minimum order quantity)\b\s*[:\-]?\s*([^\n;,]+)", re.I),
-    "lead-time-text": re.compile(r"\blead\s*time\b\s*[:\-]?\s*([^\n;,]+)", re.I),
-    "grade": re.compile(r"\bgrade\b\s*[:\-]?\s*([^\n;,]+)", re.I),
-    "price": re.compile(r"\b(?:price|unit price)\b\s*[:\-]?\s*([$€£]?\s*\d[\d,]*(?:\.\d+)?)", re.I),
+    "moq": re.compile(r"\b(?:moq|minimum order quantity)\b[ \t]*[:\-]?[ \t]*([^\n;,]+)", re.I),
+    "lead-time-text": re.compile(r"\blead\s*time\b[ \t]*[:\-]?[ \t]*([^\n;,]+)", re.I),
+    "grade": re.compile(r"\bgrade\b[ \t]*[:\-]?[ \t]*([^\n;,]+)", re.I),
+    "price": re.compile(r"\b(?:price|unit price)\b[ \t]*[:\-]?[ \t]*([$€£]?\s*\d[\d,]*(?:\.\d+)?)", re.I),
 }
 CERT_RE = re.compile(r"\b(organic|non-gmo|kosher|halal|gfsi|sqf|brc|fssc\s*22000|haccp)\b", re.I)
 SUPPLIER_RE = re.compile(

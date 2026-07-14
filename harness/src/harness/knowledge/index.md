@@ -7,6 +7,14 @@ procdork harness. Live values remain behind MCP tools and MotherDuck.
 
 * [Tables](tables/) - Grain, measures, and interpretation for reviewed analytical tables.
 
+## Query Order
+
+Prefer chartable summaries before plain tables. Look for categorical dimensions,
+numeric measures, and `*_bucket` time labels before returning row-level output.
+Use raw timestamp columns for filtering and freshness checks, but use the
+15-minute bucket columns for chart axes. Public mart ids are short stable hashes;
+do not infer business meaning from them.
+
 ## Source Events
 
 * [Document Ingestion Events](ingestion-events.md) - The source-backed completion event contract that feeds supplier intelligence.

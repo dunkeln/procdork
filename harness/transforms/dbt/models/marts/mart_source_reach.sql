@@ -28,6 +28,10 @@ select
     min(retrieved_at) as first_retrieved_at,
     max(retrieved_at) as latest_retrieved_at,
     min(cited_at) as first_cited_at,
-    max(cited_at) as latest_cited_at
+    max(cited_at) as latest_cited_at,
+    {{ chart_time('min(retrieved_at)') }} as first_retrieved_at_bucket,
+    {{ chart_time('max(retrieved_at)') }} as latest_retrieved_at_bucket,
+    {{ chart_time('min(cited_at)') }} as first_cited_at_bucket,
+    {{ chart_time('max(cited_at)') }} as latest_cited_at_bucket
 from citations
 group by 1, 2

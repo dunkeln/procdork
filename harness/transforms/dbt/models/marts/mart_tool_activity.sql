@@ -15,7 +15,9 @@ select
     count(*) as event_count,
     count(distinct turn_id) as turn_count,
     min(created_at) as first_seen_at,
-    max(created_at) as last_seen_at
+    max(created_at) as last_seen_at,
+    {{ chart_time('min(created_at)') }} as first_seen_at_bucket,
+    {{ chart_time('max(created_at)') }} as last_seen_at_bucket
 from {{ source('app', 'app_message_events') }} as activity
 join sessions as session on session.slug = activity.session_slug
 where activity.event_type = 'tool'

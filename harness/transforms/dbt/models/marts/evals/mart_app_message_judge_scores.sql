@@ -15,8 +15,11 @@ select
     judgement.result,
     judgement.evidence_uri,
     judgement.message_created_at,
+    judgement.message_created_at_bucket,
     judgement.message_completed_at,
+    judgement.message_completed_at_bucket,
     judgement.evaluated_at,
+    judgement.evaluated_at_bucket,
     judgement.evaluated_day,
     score.dimension,
     score.score

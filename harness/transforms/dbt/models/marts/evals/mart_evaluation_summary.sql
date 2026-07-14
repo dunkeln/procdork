@@ -7,6 +7,8 @@ select
     count(*) as case_count,
     avg(score) as average_score,
     min(evaluated_at) as first_evaluated_at,
-    max(evaluated_at) as last_evaluated_at
+    max(evaluated_at) as last_evaluated_at,
+    {{ chart_time('min(evaluated_at)') }} as first_evaluated_at_bucket,
+    {{ chart_time('max(evaluated_at)') }} as last_evaluated_at_bucket
 from {{ ref('stg_eval_results') }}
 group by 1, 2, 3, 4, 5

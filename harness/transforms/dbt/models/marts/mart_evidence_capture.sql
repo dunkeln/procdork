@@ -30,6 +30,8 @@ select
     evidence_type,
     count(distinct source_url) as source_count,
     min(linked_at) as first_linked_at,
-    max(linked_at) as last_linked_at
+    max(linked_at) as last_linked_at,
+    {{ chart_time('min(linked_at)') }} as first_linked_at_bucket,
+    {{ chart_time('max(linked_at)') }} as last_linked_at_bucket
 from evidence_links
 group by 1, 2, 3

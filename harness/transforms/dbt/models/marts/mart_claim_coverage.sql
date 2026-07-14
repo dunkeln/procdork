@@ -19,7 +19,9 @@ select
     sum(coalesce(conflict.has_open_conflict, 0)) as open_conflict_claim_count,
     count(distinct claim.canonical_supplier_id)::double / nullif(supplier_total.supplier_count, 0) as supplier_coverage_ratio,
     min(claim.claim_retrieved_at) as first_evidence_at,
-    max(claim.claim_retrieved_at) as latest_evidence_at
+    max(claim.claim_retrieved_at) as latest_evidence_at,
+    {{ chart_time('min(claim.claim_retrieved_at)') }} as first_evidence_at_bucket,
+    {{ chart_time('max(claim.claim_retrieved_at)') }} as latest_evidence_at_bucket
 from {{ ref('stg_ingestion_claims') }} as claim
 cross join supplier_total
 left join claim_conflicts as conflict

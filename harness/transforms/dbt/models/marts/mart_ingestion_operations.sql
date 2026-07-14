@@ -29,12 +29,13 @@ artifact_counts as (
 )
 
 select
-    event.event_id,
-    event.job_id,
-    event.session_id,
-    event.turn_id,
+    {{ chart_id('event.event_id', 'evt') }} as event_id,
+    {{ chart_id('event.job_id', 'job') }} as job_id,
+    {{ chart_id('event.session_id', 'ses') }} as session_id,
+    {{ chart_id('event.turn_id', 'turn') }} as turn_id,
     event.status,
     event.emitted_at,
+    {{ chart_time('event.emitted_at') }} as emitted_at_bucket,
     event.duration_ms,
     coalesce(source.source_count, 0) as source_count,
     coalesce(supplier.supplier_count, 0) as supplier_count,

@@ -1,7 +1,7 @@
 with deterministic as (
     select
-        run_id,
-        case_id,
+        {{ chart_id('run_id', 'run') }} as run_id,
+        {{ chart_id('case_id', 'case') }} as case_id,
         dataset_version,
         system_version,
         json_extract_string(metadata, '$.family') as case_family,
@@ -10,7 +10,7 @@ with deterministic as (
         json_extract_string(metadata, '$.agent_model') as agent_model,
         json_extract_string(metadata, '$.expected_behavior') as expected_behavior,
         cast(json_extract(metadata, '$.abstained') as boolean) as abstained,
-        json_extract_string(metadata, '$.response_sha256') as response_sha256,
+        {{ chart_id("json_extract_string(metadata, '$.response_sha256')", 'resp') }} as response_sha256,
         result as deterministic_result,
         score as deterministic_score,
         cast(json_extract(metadata, '$.elapsed_ms') as bigint) as elapsed_ms,
@@ -24,6 +24,7 @@ with deterministic as (
         cast(json_extract(metadata, '$.cost_proxy_usd') as double) as cost_proxy_usd,
         json_extract_string(metadata, '$.pricing.date') as pricing_date,
         evaluated_at,
+        {{ chart_time('evaluated_at') }} as evaluated_at_bucket,
         evidence_uri
     from {{ ref('stg_eval_results') }}
     where evaluator_name = 'benchmark_deterministic'
@@ -31,7 +32,7 @@ with deterministic as (
 
 semantic as (
     select
-        run_id,
+        {{ chart_id('run_id', 'run') }} as run_id,
         score as semantic_score,
         cast(json_extract(metadata, '$.scores.grounding') as integer) as grounding_score,
         cast(json_extract(metadata, '$.scores.task_resolution') as integer) as task_resolution_score,
@@ -62,8 +63,8 @@ automated as (
 
 human as (
     select
-        run_id,
-        case_id,
+        {{ chart_id('run_id', 'run') }} as run_id,
+        {{ chart_id('case_id', 'case') }} as case_id,
         dataset_version,
         system_version,
         json_extract_string(metadata, '$.family') as case_family,
@@ -86,6 +87,7 @@ human as (
         null::double as cost_proxy_usd,
         null::varchar as pricing_date,
         evaluated_at,
+        {{ chart_time('evaluated_at') }} as evaluated_at_bucket,
         evidence_uri,
         null::double as semantic_score,
         null::integer as grounding_score,

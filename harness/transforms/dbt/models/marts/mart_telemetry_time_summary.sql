@@ -65,6 +65,8 @@ rollup as (
         count(*) as session_count,
         min(created_at) as first_session_at,
         max(observed_at) as latest_observed_at,
+        {{ chart_time('min(created_at)') }} as first_session_at_bucket,
+        {{ chart_time('max(observed_at)') }} as latest_observed_at_bucket,
         avg(session_duration_seconds) as avg_session_duration_seconds,
         avg(message_count) as avg_messages_per_session,
         avg(turn_count) as avg_turns_per_session,

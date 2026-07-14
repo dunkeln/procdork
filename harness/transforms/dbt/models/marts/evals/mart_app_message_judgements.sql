@@ -1,6 +1,6 @@
 select
-    run_id,
-    case_id as message_id,
+    {{ chart_id('run_id', 'run') }} as run_id,
+    {{ chart_id('case_id', 'msg') }} as message_id,
     dataset_version,
     system_version,
     evaluator_version,
@@ -12,7 +12,7 @@ select
     json_extract_string(metadata, '$.session_title') as session_title,
     cast(json_extract(metadata, '$.citation_count') as bigint) as citation_count,
     cast(json_extract(metadata, '$.response_chars') as bigint) as response_chars,
-    json_extract_string(metadata, '$.response_sha256') as response_sha256,
+    {{ chart_id("json_extract_string(metadata, '$.response_sha256')", 'resp') }} as response_sha256,
     cast(json_extract(metadata, '$.scores.grounding') as integer) as grounding_score,
     cast(json_extract(metadata, '$.scores.task_resolution') as integer) as task_resolution_score,
     cast(json_extract(metadata, '$.scores.uncertainty_calibration') as integer)
@@ -29,9 +29,14 @@ select
     evidence_uri,
     cast(json_extract_string(metadata, '$.message_created_at') as timestamptz)
         as message_created_at,
+    {{ chart_time("cast(json_extract_string(metadata, '$.message_created_at') as timestamptz)") }}
+        as message_created_at_bucket,
     cast(json_extract_string(metadata, '$.message_completed_at') as timestamptz)
         as message_completed_at,
+    {{ chart_time("cast(json_extract_string(metadata, '$.message_completed_at') as timestamptz)") }}
+        as message_completed_at_bucket,
     evaluated_at,
+    {{ chart_time('evaluated_at') }} as evaluated_at_bucket,
     date_trunc('day', evaluated_at) as evaluated_day
 from {{ ref('stg_eval_results') }}
 where evaluator_name = 'app_message_judge'

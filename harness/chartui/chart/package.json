@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && INPUT=mcp-app.html vite build",
-    "dev": "INPUT=mcp-app.html vite build --watch"
+    "dev": "INPUT=mcp-app.html vite build --watch",
+    "preview": "bun run build && python3 -m http.server 5180 -d ../../src/harness/chartui"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.0",

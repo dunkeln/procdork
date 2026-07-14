@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 from uuid import uuid4
@@ -96,6 +97,77 @@ def load_chat_cases(
             ).fetchall()
         ]
     return cases
+
+
+def load_app_message_cases(
+    con: duckdb.DuckDBPyConnection, *, case_id: str | None = None, limit: int = 5
+) -> list[dict[str, object]]:
+    rows = con.execute(
+        """
+        select
+            cast(m.id as varchar) as case_id,
+            m.session_slug,
+            coalesce(nullif(s.title, ''), 'Untitled session') as session_title,
+            m.original_request as request,
+            m.content as response,
+            cast(m.created_at as varchar) as message_created_at,
+            cast(m.completed_at as varchar) as message_completed_at
+        from app_messages m
+        left join app_sessions s on s.slug = m.session_slug
+        where m.role = 'assistant'
+          and m.completed_at is not null
+          and m.original_request is not null
+          and m.session_slug not like 'eval-%'
+          and (? is null or cast(m.id as varchar) = ?)
+        order by m.completed_at desc
+        limit ?
+        """,
+        [case_id, case_id, limit],
+    ).fetchall()
+    columns = [column[0] for column in con.description]
+    cases = [dict(zip(columns, row, strict=True)) for row in rows]
+    for case in cases:
+        sources = con.execute(
+            """
+            select
+                link.position,
+                link.source_url,
+                source.title,
+                source.snippet,
+                source.source_kind,
+                source.document_type,
+                cast(source.retrieved_at as varchar) as retrieved_at
+            from app_message_sources link
+            left join app_sources source on source.url = link.source_url
+            where link.message_id = cast(? as uuid)
+            order by link.position nulls last, link.source_url
+            """,
+            [case["case_id"]],
+        ).fetchall()
+        source_columns = [column[0] for column in con.description]
+        response = str(case["response"] or "")
+        case["sources"] = [
+            shrink_source(dict(zip(source_columns, row, strict=True))) for row in sources[:12]
+        ]
+        case["citation_count"] = len(sources)
+        case["response_sha256"] = sha256(response.encode()).hexdigest()
+        case["response_chars"] = len(response)
+        case["response_excerpt"] = response[:6000]
+        case["response_truncated"] = len(response) > 6000
+        case["evidence_uri"] = f"procdork://sessions/{case['session_slug']}"
+    return cases
+
+
+def shrink_source(source: dict[str, object]) -> dict[str, object]:
+    return {
+        key: shorten(value)
+        for key, value in source.items()
+        if value not in {None, ""}
+    }
+
+
+def shorten(value: object) -> object:
+    return value[:500] if isinstance(value, str) else value
 
 
 def replay_chat(

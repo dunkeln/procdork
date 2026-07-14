@@ -57,14 +57,21 @@ def build_chart(
         value_index = numeric_column(rows)
         if value_index is None or len(columns) < 2:
             raise ValueError(f"{kind} charts require a dimension and a numeric measure")
+        line_band = kind == "line" and len(columns) >= 5 and numeric_columns(rows)[:3] == [2, 3, 4]
         if kind == "heatmap" and (len(columns) != 3 or value_index != 2):
             raise ValueError(
                 "heatmap charts require category, segment, and numeric value columns"
             )
-        segmented = len(columns) == 3 and value_index == 2
-        selected_columns = columns if segmented else [columns[0], columns[value_index]]
+        segmented = (len(columns) == 3 and value_index == 2) or line_band
+        selected_columns = (
+            columns[:5]
+            if line_band
+            else columns
+            if segmented
+            else [columns[0], columns[value_index]]
+        )
         selected_rows = (
-            [list(row) for row in rows[:12]]
+            [list(row[: len(selected_columns)]) for row in rows[:12]]
             if segmented
             else [[row[0], row[value_index]] for row in rows[:12]]
         )
@@ -104,7 +111,12 @@ def choose_chart_kind(
 
 
 def numeric_column(rows: list[tuple[object, ...]]) -> int | None:
+    return next(iter(numeric_columns(rows)), None)
+
+
+def numeric_columns(rows: list[tuple[object, ...]]) -> list[int]:
     width = max((len(row) for row in rows), default=0)
+    indexes = []
     for index in range(1, width):
         values = [
             row[index] for row in rows if index < len(row) and row[index] is not None
@@ -115,8 +127,8 @@ def numeric_column(rows: list[tuple[object, ...]]) -> int | None:
             and isfinite(float(value))
             for value in values
         ):
-            return index
-    return None
+            indexes.append(index)
+    return indexes
 
 
 def chart_facts(
@@ -127,14 +139,14 @@ def chart_facts(
 ) -> ChartFacts:
     if kind == "table":
         return ChartFacts(row_count=len(rows), column_count=len(columns), truncated=truncated)
-    value_index = len(columns) - 1
+    value_index = 2 if kind == "line" and len(columns) >= 5 else len(columns) - 1
     points = [
         (str(row[0]), float(row[value_index]))
         for row in rows
         if isinstance(row[value_index], (int, float))
     ]
     total = sum(value for _, value in points)
-    if len(columns) == 3:
+    if len(columns) >= 3:
         totals: dict[str, float] = {}
         for label, value in points:
             totals[label] = totals.get(label, 0) + value
@@ -166,7 +178,7 @@ def chart_fact_text(
         row_label = "row" if facts.row_count == 1 else "rows"
         text = [f"{facts.row_count} {row_label} shown across {facts.column_count} columns."]
     else:
-        measure = display_label(columns[-1])
+        measure = display_label(columns[2] if kind == "line" and len(columns) >= 5 else columns[-1])
         if facts.segment_count is not None:
             text = [
                 f"{facts.row_count} points plotted across {facts.segment_count} segments.",

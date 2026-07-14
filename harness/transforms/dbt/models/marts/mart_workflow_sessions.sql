@@ -52,6 +52,7 @@ select
     coalesce(nullif(session.title, ''), 'Untitled session') as session_title,
     session.created_at,
     session.updated_at,
+    event.last_event_at,
     date_diff('second', session.created_at, session.updated_at) as session_duration_seconds,
     coalesce(message.message_count, 0) as message_count,
     coalesce(message.user_message_count, 0) as user_message_count,

@@ -27,7 +27,7 @@ from .olap import connect_duckdb, load_dotenv_once
 
 KNOWLEDGE_ROOT = Path(__file__).parent / "knowledge"
 CHART_APP = files("harness").joinpath("chartui", "mcp-app.html")
-CHART_APP_URI = "ui://charts/result/v2"
+CHART_APP_URI = "ui://charts/result/v3"
 MAX_QUERY_ROWS = int(os.getenv("MCP_MAX_QUERY_ROWS", "500"))
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False

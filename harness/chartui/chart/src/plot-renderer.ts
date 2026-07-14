@@ -1,8 +1,16 @@
-import type { ChartDatum, ChartViewModel, HeatmapMode } from "./chart-contract";
+import type { ChartCell, ChartDatum, ChartViewModel, HeatmapMode } from "./chart-contract";
 
 type PlotModule = typeof import("@observablehq/plot");
 type PlotOptions = Parameters<PlotModule["plot"]>[0];
-type PlotDatum = Record<string, unknown>;
+type HeatmapBin = Record<string, unknown> & {
+  __x: number;
+  __y: number;
+  count: number;
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+};
 
 const SERIES_COLORS = ["#2274A5", "#78C091", "#87B3D4", "#131B23", "#816C61"];
 const HEAT_COLORS = ["#edf6f9", "#87B3D4", "#2274A5", "#131B23"];
@@ -26,8 +34,10 @@ function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel
     title: tooltip(chart),
   };
 
+  const xCount = new Set(chart.data.map((datum) => datum[chart.dimension])).size || 1;
+
   return Plot.plot({
-    width: plotWidth(target),
+    width: Math.max(plotWidth(target), 126 + xCount * 96),
     height: 260,
     marginTop: 12,
     marginRight: 18,
@@ -43,6 +53,18 @@ function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel
       chart.chart_kind === "line"
         ? [
             Plot.ruleY([0]),
+            ...(chart.lower && chart.upper
+              ? [
+                  Plot.areaY(chart.data, {
+                    x: chart.dimension,
+                    y1: chart.lower,
+                    y2: chart.upper,
+                    fill: chart.series ?? "#000",
+                    z: chart.series,
+                    opacity: 0.18,
+                  }),
+                ]
+              : []),
             Plot.lineY(chart.data, {
               ...markOptions,
               stroke: chart.series ?? "#000",
@@ -62,69 +84,76 @@ function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel
   } satisfies PlotOptions);
 }
 
-function renderHeatmap(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
+function renderHeatmap(_Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement {
   return resolveHeatmapMode(chart) === "continuous"
-    ? renderContinuousHeatmap(Plot, target, chart)
-    : renderCategoricalHeatmap(Plot, target, chart);
+    ? renderContinuousHeatmap(target, chart)
+    : renderCategoricalHeatmap(chart);
 }
 
-function renderCategoricalHeatmap(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
-  const data = compactHeatmapData(chart);
-  const xCount = new Set(data.map((datum) => datum.__x)).size || 1;
-  const yCount = new Set(data.map((datum) => datum[chart.series ?? ""])).size || 1;
-  const margins = { top: 30, right: 18, bottom: 34, left: 84 };
-  const cell = xCount * yCount > 80 ? 20 : 34;
+function renderCategoricalHeatmap(chart: ChartViewModel): HTMLElement {
+  const xValues = unique(chart.data.map((datum) => datum[chart.dimension]));
+  const yValues = unique(chart.data.map((datum) => datum[chart.series ?? ""]));
+  const values = chart.data.map((datum) => finiteNumber(datum[chart.value])).filter((value) => value != null);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, min + 1);
+  const byCell = new Map<string, ChartDatum>();
+  const root = document.createElement("section");
+  const grid = document.createElement("div");
+  const cellSize = xValues.length * yValues.length > 80 ? 22 : 34;
 
-  return Plot.plot({
-    width: margins.left + margins.right + xCount * cell,
-    height: margins.top + margins.bottom + yCount * cell,
-    marginTop: margins.top,
-    marginRight: margins.right,
-    marginBottom: margins.bottom,
-    marginLeft: margins.left,
-    x: { label: displayLabel(chart.dimension), tickSize: 0 },
-    y: { label: displayLabel(chart.series ?? ""), tickSize: 0 },
-    color: { label: displayLabel(chart.value), legend: true, type: "linear", range: HEAT_COLORS },
-    style: plotStyle(),
-    marks: [
-      Plot.cell(data, {
-        x: "__x",
-        y: chart.series,
-        fill: chart.value,
-        inset: xCount * yCount > 80 ? 0.7 : 1.7,
-        title: tooltip(chart),
-      }),
-    ],
-  } satisfies PlotOptions);
+  root.className = "chartui-heatmap";
+  grid.className = "chartui-heatmap-grid";
+  grid.style.setProperty("--cell", `${cellSize}px`);
+  grid.style.gridTemplateColumns = `minmax(84px, max-content) repeat(${xValues.length}, var(--cell))`;
+
+  for (const datum of chart.data) {
+    byCell.set(`${String(datum[chart.dimension])}\u0000${String(datum[chart.series ?? ""])}`, datum);
+  }
+
+  grid.appendChild(labelCell(""));
+  xValues.forEach((value, index) => grid.appendChild(labelCell(String(index + 1), String(value))));
+
+  for (const y of yValues) {
+    grid.appendChild(labelCell(String(y), String(y), "chartui-y-label"));
+    for (const x of xValues) {
+      const datum = byCell.get(`${String(x)}\u0000${String(y)}`);
+      grid.appendChild(datum ? heatCell(categoricalTooltip(chart, datum), datum[chart.value], min, max) : emptyCell());
+    }
+  }
+
+  root.append(legend(min, max, chart.value), grid);
+  attachHeatmapTooltip(root);
+  return root;
 }
 
-function renderContinuousHeatmap(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
+function renderContinuousHeatmap(target: HTMLElement, chart: ChartViewModel): HTMLElement {
   const width = plotWidth(target);
   const columns = Math.max(24, Math.min(42, Math.floor((width - 88) / 18)));
   const rows = Math.max(16, Math.min(38, Math.round(columns * 0.72)));
   const cell = Math.max(14, Math.min(20, Math.floor((width - 96) / columns)));
-  return Plot.plot({
-    width: Math.max(520, 76 + columns * cell),
-    height: Math.max(340, 52 + rows * cell),
-    marginTop: 24,
-    marginRight: 18,
-    marginBottom: 42,
-    marginLeft: 54,
-    x: { axis: null },
-    y: { axis: null },
-    color: { label: displayLabel(chart.value), legend: true, type: "linear", range: HEAT_COLORS },
-    style: plotStyle(),
-    marks: [
-      Plot.cell(squareHeatmapData(chart, columns, rows), {
-        x: "__x",
-        y: "__y",
-        fill: "count",
-        inset: 1.7,
-        title: (datum) =>
-          `${displayLabel(chart.dimension)} bin: ${datum.__x}\n${displayLabel(chart.series ?? "")} bin: ${datum.__y}\nCount: ${datum.count}`,
-      }),
-    ],
-  } satisfies PlotOptions);
+  const data = squareHeatmapData(chart, columns, rows);
+  const max = Math.max(...data.map((datum) => Number(datum.count)), 1);
+  const root = document.createElement("section");
+  const grid = document.createElement("div");
+
+  root.className = "chartui-heatmap";
+  grid.className = "chartui-heatmap-grid chartui-heatmap-grid-continuous";
+  grid.style.setProperty("--cell", `${cell}px`);
+  grid.style.gridTemplateColumns = `repeat(${columns}, var(--cell))`;
+  grid.style.width = `${columns * cell}px`;
+
+  const byCell = new Map(data.map((datum) => [`${datum.__x}:${datum.__y}`, datum]));
+  for (let y = 0; y < rows; y += 1) {
+    for (let x = 0; x < columns; x += 1) {
+      const datum = byCell.get(`${x}:${y}`);
+      const node = datum ? heatCell(continuousTooltip(chart, datum), datum.count, 0, max) : emptyCell();
+      grid.appendChild(node);
+    }
+  }
+
+  root.append(legend(0, max, chart.value), grid);
+  attachHeatmapTooltip(root);
+  return root;
 }
 
 function resolveHeatmapMode(chart: ChartViewModel): Exclude<HeatmapMode, "auto" | "calendar"> {
@@ -135,21 +164,12 @@ function resolveHeatmapMode(chart: ChartViewModel): Exclude<HeatmapMode, "auto" 
     : "categorical";
 }
 
-function compactHeatmapData(chart: ChartViewModel): PlotDatum[] {
-  const labels = new Map<unknown, string>();
-  return chart.data.map((datum) => {
-    const category = datum[chart.dimension];
-    if (!labels.has(category)) labels.set(category, String(labels.size + 1));
-    return { ...datum, __x: labels.get(category) ?? "" };
-  });
-}
-
 function hasContinuousAxis(data: ChartDatum[], column: string): boolean {
   const values = data.filter((datum) => datum[column] != null);
   return values.length > 0 && values.every((datum) => continuousValue(datum[column]) != null);
 }
 
-function squareHeatmapData(chart: ChartViewModel, columns: number, rows: number): PlotDatum[] {
+function squareHeatmapData(chart: ChartViewModel, columns: number, rows: number): HeatmapBin[] {
   const points = chart.data
     .map((datum) => ({
       x: continuousValue(datum[chart.dimension]),
@@ -175,7 +195,15 @@ function squareHeatmapData(chart: ChartViewModel, columns: number, rows: number)
 
   return Array.from(counts, ([key, count]) => {
     const [x, y] = key.split(":").map(Number);
-    return { __x: x, __y: y, count };
+    return {
+      __x: x,
+      __y: y,
+      count,
+      x0: minX + (x / columns) * (maxX - minX || 1),
+      x1: minX + ((x + 1) / columns) * (maxX - minX || 1),
+      y0: minY + ((rows - y - 1) / rows) * (maxY - minY || 1),
+      y1: minY + ((rows - y) / rows) * (maxY - minY || 1),
+    };
   });
 }
 
@@ -197,6 +225,110 @@ function continuousValue(value: unknown): number | Date | null {
 function tooltip(chart: ChartViewModel): (datum: Record<string, unknown>) => string {
   return (datum) =>
     chart.columns.map((column) => `${displayLabel(column)}: ${String(datum[column] ?? "")}`).join("\n");
+}
+
+function heatCell(tooltipText: string, rawValue: unknown, min: number, max: number): HTMLDivElement {
+  const cell = document.createElement("div");
+  const value = finiteNumber(rawValue) ?? 0;
+  cell.className = "chartui-heat-cell";
+  cell.style.backgroundColor = heatColor((value - min) / (max - min || 1));
+  cell.dataset.tooltip = tooltipText;
+  return cell;
+}
+
+function emptyCell(): HTMLDivElement {
+  const cell = document.createElement("div");
+  cell.className = "chartui-heat-cell chartui-heat-cell-empty";
+  return cell;
+}
+
+function labelCell(text: string, title = text, className = "chartui-heat-label"): HTMLDivElement {
+  const cell = document.createElement("div");
+  cell.className = className;
+  cell.textContent = text;
+  cell.title = title;
+  return cell;
+}
+
+function legend(min: number, max: number, column: string): HTMLDivElement {
+  const node = document.createElement("div");
+  node.className = "chartui-heat-legend";
+  node.innerHTML = `<span>${displayLabel(column)}</span><i></i><small>${formatNumber(min)}</small><small>${formatNumber(max)}</small>`;
+  return node;
+}
+
+function attachHeatmapTooltip(root: HTMLElement): void {
+  const tooltip = document.createElement("div");
+  tooltip.className = "chartui-heat-tooltip";
+  root.appendChild(tooltip);
+
+  root.addEventListener("pointermove", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("[data-tooltip]") : null;
+    if (!target?.dataset.tooltip) {
+      tooltip.removeAttribute("data-visible");
+      return;
+    }
+    const rect = root.getBoundingClientRect();
+    tooltip.textContent = target.dataset.tooltip;
+    tooltip.style.left = `${event.clientX - rect.left + 12}px`;
+    tooltip.style.top = `${event.clientY - rect.top + 12}px`;
+    tooltip.dataset.visible = "true";
+  });
+
+  root.addEventListener("pointerleave", () => tooltip.removeAttribute("data-visible"));
+}
+
+function categoricalTooltip(chart: ChartViewModel, datum: ChartDatum): string {
+  return [
+    `${displayLabel(chart.dimension)}: ${String(datum[chart.dimension] ?? "")}`,
+    chart.series ? `${displayLabel(chart.series)}: ${String(datum[chart.series] ?? "")}` : "",
+    `${displayLabel(chart.value)}: ${formatNumber(finiteNumber(datum[chart.value]) ?? 0)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function continuousTooltip(chart: ChartViewModel, datum: HeatmapBin): string {
+  return [
+    `${displayLabel(chart.dimension)}: ${formatNumber(datum.x0)}-${formatNumber(datum.x1)}`,
+    chart.series ? `${displayLabel(chart.series)}: ${formatNumber(datum.y0)}-${formatNumber(datum.y1)}` : "",
+    `Count: ${formatNumber(datum.count)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function unique(values: unknown[]): ChartCell[] {
+  const seen = new Set<string>();
+  return values.filter((value): value is ChartCell => {
+    const key = String(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  });
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function heatColor(value: number): string {
+  const ratio = clamp(value, 0, 1);
+  const index = Math.min(HEAT_COLORS.length - 2, Math.floor(ratio * (HEAT_COLORS.length - 1)));
+  const local = ratio * (HEAT_COLORS.length - 1) - index;
+  return mixHex(HEAT_COLORS[index], HEAT_COLORS[index + 1], local);
+}
+
+function mixHex(left: string, right: string, ratio: number): string {
+  const a = parseInt(left.slice(1), 16);
+  const b = parseInt(right.slice(1), 16);
+  const channel = (shift: number) =>
+    Math.round(((a >> shift) & 255) * (1 - ratio) + ((b >> shift) & 255) * ratio);
+  return `rgb(${channel(16)} ${channel(8)} ${channel(0)})`;
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
 function displayLabel(column: string): string {

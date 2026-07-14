@@ -8,9 +8,14 @@ from pathlib import Path
 
 import click
 
+from .app_message_judging import judge_app_messages
 from .connectors.neon import sync_neon_chat
 from .connectors.ingestion import sync_ingestion_events
-from .connectors.procdork import chat_dataset_version, load_chat_cases, replay_chat
+from .connectors.procdork import (
+    chat_dataset_version,
+    load_chat_cases,
+    replay_chat,
+)
 from .connectors.sources import read_url_or_file
 from .connectors.storage import append_jsonl, write_local_blob
 from .evaluations import (
@@ -20,6 +25,7 @@ from .evaluations import (
 )
 from .evaluators.inline_citations import NAME as EVALUATOR_NAME
 from .evaluators.inline_citations import evaluate
+from .evaluators.app_message_judge import RUBRIC_VERSION as APP_MESSAGE_RUBRIC_VERSION
 from .extraction import extract_source
 from .load import load_manifest_duckdb, load_raw
 from .olap import connect_duckdb, load_dotenv_once
@@ -272,6 +278,56 @@ def eval_replay(
     click.echo(
         json.dumps({"dataset_version": dataset_version, "cases": results}, indent=2)
     )
+
+
+@main.command("judge-app-messages")
+@click.option(
+    "--system-version",
+    required=True,
+    help="Application or harness release being judged.",
+)
+@click.option(
+    "--judge-model",
+    default=None,
+    help="Anthropic judge model. Defaults to ANTHROPIC_JUDGE_MODEL or ANTHROPIC_MODEL.",
+)
+@click.option("--judge-version", default="1", show_default=True)
+@click.option(
+    "--rubric-version",
+    default=APP_MESSAGE_RUBRIC_VERSION,
+    show_default=True,
+)
+@click.option("--case-id", default=None, help="Judge one assistant message ID.")
+@click.option("--limit", default=5, show_default=True, type=click.IntRange(1, 50))
+@click.option("--batch-id", default=None, help="Stable id for retrying one batch.")
+@click.option("--duckdb-path", default=None, help="DuckDB/MotherDuck path.")
+def judge_app_messages_command(
+    system_version: str,
+    judge_model: str | None,
+    judge_version: str,
+    rubric_version: str,
+    case_id: str | None,
+    limit: int,
+    batch_id: str | None,
+    duckdb_path: str | None,
+) -> None:
+    """Manually judge stored application answers in a small batch."""
+    load_dotenv_once()
+    try:
+        with connect_duckdb(duckdb_path) as connection:
+            result = judge_app_messages(
+                connection,
+                system_version=system_version,
+                judge_model=judge_model,
+                judge_version=judge_version,
+                rubric_version=rubric_version,
+                case_id=case_id,
+                limit=limit,
+                batch_id=batch_id,
+            )
+    except (RuntimeError, ValueError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps(result, indent=2, sort_keys=True))
 
 
 @main.command("serve-mcp")

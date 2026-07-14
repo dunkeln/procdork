@@ -33,6 +33,8 @@ export type ChartViewModel = ChartPayload & {
   dimension: string;
   value: string;
   series?: string;
+  lower?: string;
+  upper?: string;
 };
 
 export function normalizeChartPayload(input: unknown): ChartViewModel | null {
@@ -53,6 +55,7 @@ export function normalizeChartPayload(input: unknown): ChartViewModel | null {
     return datum;
   });
 
+  const banded = chart_kind === "line" && columns.length >= 5;
   return {
     title: typeof raw.title === "string" && raw.title.trim() ? raw.title : "Analytics result",
     chart_kind,
@@ -64,8 +67,10 @@ export function normalizeChartPayload(input: unknown): ChartViewModel | null {
     heatmap_mode: heatmapMode(raw.heatmap_mode),
     data,
     dimension: columns[0],
-    value: columns[columns.length - 1],
-    series: columns.length === 3 ? columns[1] : undefined,
+    value: banded ? columns[2] : columns[columns.length - 1],
+    series: columns.length >= 3 ? columns[1] : undefined,
+    lower: banded ? columns[3] : undefined,
+    upper: banded ? columns[4] : undefined,
   };
 }
 

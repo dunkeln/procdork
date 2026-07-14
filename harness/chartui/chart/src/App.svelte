@@ -36,7 +36,7 @@
   onMount(() => {
     const mock = new URLSearchParams(window.location.search).get("mock");
     if (mock !== null) {
-      setChart(normalizeChartPayload(mock === "heatmap" ? heatmapMock() : barMock()));
+      setChart(normalizeChartPayload(mock === "heatmap" ? heatmapMock() : mock === "band" ? bandMock() : barMock()));
       status = "Mock result";
       return;
     }
@@ -111,6 +111,31 @@
         column_count: 3,
         group_count: rows.length,
         segment_count: rows.length,
+        truncated: false,
+      },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function bandMock() {
+    return {
+      title: "Judge Drift",
+      chart_kind: "line",
+      columns: ["evaluated_day", "dimension", "rolling_average_score", "lower_score", "upper_score"],
+      rows: [
+        ["2026-07-12", "grounding", 3.1, 2.6, 3.6],
+        ["2026-07-13", "grounding", 3.4, 2.8, 4.0],
+        ["2026-07-14", "grounding", 3.2, 2.5, 3.9],
+        ["2026-07-12", "consistency", 3.8, 3.4, 4.2],
+        ["2026-07-13", "consistency", 3.7, 3.1, 4.3],
+        ["2026-07-14", "consistency", 3.9, 3.5, 4.3],
+      ],
+      facts: {
+        row_count: 6,
+        column_count: 5,
+        group_count: 3,
+        segment_count: 2,
         truncated: false,
       },
       key_facts: [],
@@ -241,12 +266,13 @@
   .chart-host {
     min-width: 0;
     min-height: 260px;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .chart-host :global(svg),
   .chart-host :global(figure) {
     display: block;
-    max-width: 100%;
     margin: 0 auto;
   }
 
@@ -254,6 +280,94 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
+  }
+
+  .chart-host :global(.chartui-heatmap) {
+    position: relative;
+    display: grid;
+    justify-content: center;
+    gap: 14px;
+    min-width: max-content;
+    padding: 4px 10px 2px;
+  }
+
+  .chart-host :global(.chartui-heat-legend) {
+    display: grid;
+    grid-template-columns: auto 160px auto auto;
+    align-items: center;
+    justify-content: start;
+    gap: 8px;
+    font-size: 11px;
+    color: rgb(0 0 0 / 62%);
+  }
+
+  .chart-host :global(.chartui-heat-legend i) {
+    height: 10px;
+    background: linear-gradient(90deg, #edf6f9, #87b3d4, #2274a5, #131b23);
+  }
+
+  .chart-host :global(.chartui-heatmap-grid) {
+    display: grid;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chart-host :global(.chartui-heatmap-grid-continuous) {
+    gap: 3px;
+  }
+
+  .chart-host :global(.chartui-heat-cell) {
+    width: var(--cell);
+    height: var(--cell);
+    box-sizing: border-box;
+  }
+
+  .chart-host :global(.chartui-heat-cell[data-tooltip]) {
+    cursor: default;
+  }
+
+  .chart-host :global(.chartui-heat-tooltip) {
+    position: absolute;
+    z-index: 2;
+    display: none;
+    max-width: 260px;
+    padding: 7px 9px;
+    border: 1px solid rgb(255 255 255 / 16%);
+    border-radius: 6px;
+    background: #131b23;
+    box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
+    color: #fff;
+    font-size: 11px;
+    line-height: 1.45;
+    pointer-events: none;
+    white-space: pre-line;
+  }
+
+  .chart-host :global(.chartui-heat-tooltip[data-visible]) {
+    display: block;
+  }
+
+  .chart-host :global(.chartui-heat-cell-empty) {
+    background: transparent;
+  }
+
+  .chart-host :global(.chartui-heat-label),
+  .chart-host :global(.chartui-y-label) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: rgb(0 0 0 / 58%);
+  }
+
+  .chart-host :global(.chartui-heat-label) {
+    text-align: center;
+  }
+
+  .chart-host :global(.chartui-y-label) {
+    max-width: 144px;
+    text-align: right;
   }
 
   .chart-host :global(th),

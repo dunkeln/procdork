@@ -7,6 +7,9 @@
 * [Tool Activity](tool_activity.md) - Tool usage volume and status by session and tool.
 * [Source Reach](source_reach.md) - Cited source-domain and evidence-type coverage.
 * [Evaluation Cases](evaluation_cases.md) - Latest evaluation outcome for each case and evaluator.
+* [App Message Judgements](app_message_judgements.md) - Versioned LLM-as-judge scores for stored application answers.
+* [App Message Judge Scores](app_message_judge_scores.md) - Chart-ready answer-quality scores by dimension.
+* [App Message Judge Drift](app_message_judge_drift.md) - Daily judged-quality trend with a variance band.
 * [Benchmark Runs](benchmark_runs.md) - Run-level quality, reliability, efficiency, and cost evidence.
 * [Benchmark Summary](benchmark_summary.md) - Comparable metrics by treatment and analytical behavior.
 * [Benchmark Calibration](benchmark_calibration.md) - Human agreement with the semantic judge.

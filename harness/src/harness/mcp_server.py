@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from importlib.resources import files
 from pathlib import Path
 from typing import Callable, Literal
 
@@ -25,7 +26,13 @@ from .olap import connect_duckdb, load_dotenv_once
 
 
 KNOWLEDGE_ROOT = Path(__file__).parent / "knowledge"
-CHART_APP = Path(__file__).parents[2] / "mcp_apps" / "chart" / "dist" / "mcp-app.html"
+PACKAGE_CHART_APP = files("harness").joinpath(
+    "chartui", "chart", "dist", "mcp-app.html"
+)
+SOURCE_CHART_APP = (
+    Path(__file__).parents[2] / "chartui" / "chart" / "dist" / "mcp-app.html"
+)
+CHART_APP = PACKAGE_CHART_APP if PACKAGE_CHART_APP.is_file() else SOURCE_CHART_APP
 CHART_APP_URI = "ui://charts/result"
 MAX_QUERY_ROWS = int(os.getenv("MCP_MAX_QUERY_ROWS", "500"))
 READ_ONLY = ToolAnnotations(

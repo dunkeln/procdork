@@ -26,5 +26,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/harness"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"chartui/chart/dist/mcp-app.html" = "harness/chartui/chart/dist/mcp-app.html"
+
 [dependency-groups]
 benchmark = ["anthropic>=0.75.0"]

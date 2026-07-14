@@ -73,11 +73,11 @@ function renderCategoricalHeatmap(Plot: PlotModule, target: HTMLElement, chart: 
   const xCount = new Set(data.map((datum) => datum.__x)).size || 1;
   const yCount = new Set(data.map((datum) => datum[chart.series ?? ""])).size || 1;
   const margins = { top: 30, right: 18, bottom: 34, left: 84 };
-  const width = plotWidth(target);
+  const cell = xCount * yCount > 80 ? 20 : 34;
 
   return Plot.plot({
-    width,
-    height: heatmapHeight(width, yCount),
+    width: margins.left + margins.right + xCount * cell,
+    height: margins.top + margins.bottom + yCount * cell,
     marginTop: margins.top,
     marginRight: margins.right,
     marginBottom: margins.bottom,
@@ -91,7 +91,7 @@ function renderCategoricalHeatmap(Plot: PlotModule, target: HTMLElement, chart: 
         x: "__x",
         y: chart.series,
         fill: chart.value,
-        inset: xCount * yCount > 80 ? 0.4 : 1,
+        inset: xCount * yCount > 80 ? 0.7 : 1.7,
         title: tooltip(chart),
       }),
     ],
@@ -214,10 +214,6 @@ function plotStyle() {
 
 function plotWidth(target: HTMLElement): number {
   return Math.max(target.clientWidth || 560, 320);
-}
-
-function heatmapHeight(width: number, yCount = 10): number {
-  return Math.max(260, Math.min(520, Math.round(width * 0.68), yCount * 34 + 92));
 }
 
 function renderTable(chart: ChartViewModel): HTMLTableElement {

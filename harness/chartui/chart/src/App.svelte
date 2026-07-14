@@ -167,7 +167,7 @@
 <main class="shell">
   {#if chart}
     <header>
-      <h1>Analytics</h1>
+      <h1>{chart.title || "Analytics"}</h1>
     </header>
 
     <div class="plot-row">
@@ -247,7 +247,7 @@
   .chart-host :global(figure) {
     display: block;
     max-width: 100%;
-    margin: 0;
+    margin: 0 auto;
   }
 
   .chart-host :global(table) {

@@ -211,6 +211,46 @@ def _(colors, mo, plt, requested_facts):
 
 
 @app.cell
+def _(con, mo):
+    _df = mo.sql(
+        f"""
+        WITH procurement_turns AS (
+                SELECT
+                    session_slug || ' / ' || strftime(created_at, '%m-%d %H:%M') AS work_item,
+                    lower(coalesce(original_request, content)) AS request
+                FROM main.app_messages
+                WHERE role = 'user'
+                  AND session_slug LIKE 'operator-%'
+                  AND (
+                      lower(coalesce(original_request, content)) LIKE '%supplier%'
+                      OR lower(coalesce(original_request, content)) LIKE '%sourcing%'
+                      OR lower(coalesce(original_request, content)) LIKE '%rfq%'
+                      OR lower(coalesce(original_request, content)) LIKE '%coa%'
+                      OR lower(coalesce(original_request, content)) LIKE '%spec%'
+                      OR lower(coalesce(original_request, content)) LIKE '%ingredient%'
+                  )
+            ),
+            fact_flags AS (
+                SELECT work_item, 'MOQ' AS fact, request LIKE '%moq%' AS requested FROM procurement_turns
+                UNION ALL SELECT work_item, 'Lead time', request LIKE '%lead time%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'COA', request LIKE '%coa%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'Spec sheet', request LIKE '%spec%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'Certification', request LIKE '%certif%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'Packaging', request LIKE '%packag%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'Origin / stock', request LIKE '%country of origin%' OR request LIKE '%stock location%' FROM procurement_turns
+                UNION ALL SELECT work_item, 'Dual source', request LIKE '%dual-source%' OR request LIKE '%dual source%' FROM procurement_turns
+            )
+            SELECT work_item, fact, 1 AS request_count
+            FROM fact_flags
+            WHERE requested
+            ORDER BY 1, 2
+        """,
+        engine=con
+    )
+    return
+
+
+@app.cell
 def _():
     return
 

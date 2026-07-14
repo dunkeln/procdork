@@ -1,56 +1,42 @@
 <script lang="ts">
-  import { App as McpApp, applyDocumentTheme, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
+  import { App as McpApp, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
   import * as Plot from "@observablehq/plot";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { normalizeChartPayload } from "./chart-contract";
   import type { ChartViewModel } from "./chart-contract";
   import { createPlotRenderer } from "./plot-renderer";
 
-  type SummaryItem = { label: string; value: string };
+  type StatItem = { label: string; value: string };
 
   let status = "Connecting...";
   let chart: ChartViewModel | null = null;
-  let hiddenSegments: string[] = [];
   let app: McpApp | null = null;
   let chartEl: HTMLDivElement;
+  let chartWidth = 0;
+  let observedEl: HTMLDivElement | undefined;
+  let resizeObserver: ResizeObserver | undefined;
   const renderer = createPlotRenderer(Plot);
 
-  $: segmentOptions = chart ? chartSegments(chart) : [];
-  $: renderedChart = chart ? filterSegments(chart, hiddenSegments) : null;
-  $: if (chartEl && renderedChart) {
-    renderer.render(chartEl, renderedChart);
+  $: yAxisLabel = chart && chart.chart_kind !== "heatmap" ? displayLabel(chart.value) : "";
+  $: xAxisLabel = chart && chart.chart_kind !== "heatmap" ? displayLabel(chart.dimension) : "";
+  $: if (chartEl && chartEl !== observedEl) {
+    resizeObserver?.disconnect();
+    observedEl = chartEl;
+    resizeObserver = new ResizeObserver(() => {
+      chartWidth = chartEl.clientWidth;
+    });
+    resizeObserver.observe(chartEl);
+    chartWidth = chartEl.clientWidth;
+  }
+  $: if (chartEl && chart) {
+    chartWidth;
+    renderer.render(chartEl, chart);
   }
 
   onMount(() => {
-    if (new URLSearchParams(window.location.search).has("mock")) {
-      setChart(normalizeChartPayload({
-        title: "Analytics",
-        chart_kind: "bar",
-        columns: ["evidence_type", "status", "count"],
-        rows: [
-          ["citation", "accepted", 19],
-          ["citation", "review", 10],
-          ["source", "accepted", 12],
-          ["source", "review", 6],
-          ["tool", "accepted", 5],
-          ["tool", "review", 2],
-        ],
-        facts: {
-          row_count: 6,
-          column_count: 3,
-          group_count: 3,
-          segment_count: 2,
-          total: 54,
-          max_group: { label: "citation", value: 29 },
-          truncated: false,
-        },
-        key_facts: [
-          "3 evidence types plotted.",
-          "Highest total count: 29 at citation.",
-          "Displayed total count: 54.",
-        ],
-        truncated: false,
-      }));
+    const mock = new URLSearchParams(window.location.search).get("mock");
+    if (mock !== null) {
+      setChart(normalizeChartPayload(mock === "heatmap" ? heatmapMock() : barMock()));
       status = "Mock result";
       return;
     }
@@ -63,7 +49,6 @@
     };
 
     app.onhostcontextchanged = (ctx) => {
-      if (ctx.theme) applyDocumentTheme(ctx.theme);
       if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
     };
 
@@ -74,30 +59,85 @@
 
     app.connect().then(() => {
       const ctx = app?.getHostContext();
-      if (ctx?.theme) applyDocumentTheme(ctx.theme);
       if (ctx?.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
       status = "Waiting for chart data";
     });
   });
 
-  function summaryItems(view: ChartViewModel): SummaryItem[] {
-    const items: SummaryItem[] = [];
-    if (view.facts.total !== undefined) {
-      items.push({ label: "Total", value: formatNumber(view.facts.total) });
-    } else {
-      items.push({ label: "Rows", value: formatNumber(view.facts.row_count) });
-    }
-    if (view.facts.max_group) {
-      items.push({
-        label: "Peak",
-        value: `${view.facts.max_group.label} ${formatNumber(view.facts.max_group.value)}`,
-      });
-    }
-    items.push({
-      label: view.facts.segment_count !== undefined ? "Segments" : "Columns",
-      value: formatNumber(view.facts.segment_count ?? view.facts.column_count),
+  onDestroy(() => resizeObserver?.disconnect());
+
+  function barMock() {
+    return {
+      title: "Analytics",
+      chart_kind: "bar",
+      columns: ["evidence_type", "status", "count"],
+      rows: [
+        ["citation", "accepted", 19],
+        ["citation", "review", 10],
+        ["source", "accepted", 12],
+        ["source", "review", 6],
+        ["tool", "accepted", 5],
+        ["tool", "review", 2],
+      ],
+      facts: {
+        row_count: 6,
+        column_count: 3,
+        group_count: 3,
+        segment_count: 2,
+        total: 54,
+        max_group: { label: "citation", value: 29 },
+        truncated: false,
+      },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function heatmapMock() {
+    const rows = Array.from({ length: 180 }, (_, index) => {
+      const x = 0.25 + (index % 45) / 18;
+      const band = Math.floor(index / 45);
+      const y = 800 + x * x * 2200 + band * 1700 + Math.sin(index * 1.7) * 480;
+      return [x, Math.max(300, y), 1];
     });
-    return items;
+    return {
+      title: "Analytics",
+      chart_kind: "heatmap",
+      heatmap_mode: "continuous",
+      columns: ["carat", "price", "count"],
+      rows,
+      facts: {
+        row_count: rows.length,
+        column_count: 3,
+        group_count: rows.length,
+        segment_count: rows.length,
+        truncated: false,
+      },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function statsItems(view: ChartViewModel): StatItem[] {
+    const values = view.data
+      .map((datum) => finiteNumber(datum[view.value]))
+      .filter((value) => Number.isFinite(value))
+      .sort((left, right) => left - right);
+    if (!values.length) {
+      return [
+        { label: "Rows", value: formatNumber(view.facts.row_count) },
+        { label: "Columns", value: formatNumber(view.facts.column_count) },
+      ];
+    }
+    return [
+      { label: "Count", value: formatNumber(values.length) },
+      { label: "Min", value: formatNumber(values[0]) },
+      { label: "P25", value: formatNumber(quantile(values, 0.25)) },
+      { label: "Median", value: formatNumber(quantile(values, 0.5)) },
+      { label: "Mean", value: formatNumber(values.reduce((sum, value) => sum + value, 0) / values.length) },
+      { label: "P75", value: formatNumber(quantile(values, 0.75)) },
+      { label: "Max", value: formatNumber(values[values.length - 1]) },
+    ];
   }
 
   function formatNumber(value: number): string {
@@ -106,84 +146,38 @@
 
   function setChart(view: ChartViewModel | null): void {
     chart = view;
-    hiddenSegments = [];
   }
 
-  function chartSegments(view: ChartViewModel): string[] {
-    if (!view.series || view.chart_kind === "heatmap" || view.chart_kind === "table") return [];
-    return Array.from(new Set(view.data.map((datum) => String(datum[view.series ?? ""] ?? "")))).filter(Boolean);
+  function quantile(values: number[], q: number): number {
+    const index = (values.length - 1) * q;
+    const lower = Math.floor(index);
+    const upper = Math.ceil(index);
+    return values[lower] + (values[upper] - values[lower]) * (index - lower);
   }
 
-  function toggleSegment(segment: string): void {
-    const hidden = hiddenSegments.includes(segment);
-    if (!hidden && segmentOptions.length - hiddenSegments.length <= 1) return;
-    hiddenSegments = hidden
-      ? hiddenSegments.filter((item) => item !== segment)
-      : [...hiddenSegments, segment];
+  function finiteNumber(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) ? value : Number.NaN;
   }
 
-  function filterSegments(view: ChartViewModel, hiddenItems: string[]): ChartViewModel {
-    if (!view.series || hiddenItems.length === 0) return view;
-    const hidden = new Set(hiddenItems);
-    const seriesIndex = view.columns.indexOf(view.series);
-    const rows = view.rows.filter((row) => !hidden.has(String(row[seriesIndex] ?? "")));
-    const data = view.data.filter((datum) => !hidden.has(String(datum[view.series ?? ""] ?? "")));
-    return {
-      ...view,
-      rows,
-      data,
-      facts: {
-        ...view.facts,
-        row_count: rows.length,
-        group_count: view.facts.group_count === undefined ? undefined : new Set(data.map((datum) => datum[view.dimension])).size,
-        segment_count: view.facts.segment_count === undefined ? undefined : chartSegments({ ...view, data }).length,
-        total: view.facts.total === undefined ? undefined : data.reduce((sum, datum) => sum + numberValue(datum[view.value]), 0),
-        max_group: view.facts.max_group ? maxGroup(view, data) : undefined,
-      },
-    };
-  }
-
-  function maxGroup(view: ChartViewModel, data: ChartViewModel["data"]): ChartViewModel["facts"]["max_group"] {
-    const totals = new Map<string, number>();
-    data.forEach((datum) => {
-      const label = String(datum[view.dimension] ?? "");
-      totals.set(label, (totals.get(label) ?? 0) + numberValue(datum[view.value]));
-    });
-    return Array.from(totals, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)[0];
-  }
-
-  function numberValue(value: unknown): number {
-    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  function displayLabel(column: string): string {
+    return column.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 </script>
 
 <main class="shell">
-  {#if chart && renderedChart}
+  {#if chart}
     <header>
-      <span>{chart.chart_kind}</span>
       <h1>Analytics</h1>
-      <i aria-hidden="true"></i>
     </header>
 
-    {#if segmentOptions.length > 1}
-      <div class="segments" aria-label="Visible series">
-        {#each segmentOptions as segment}
-          <button
-            type="button"
-            class:muted={hiddenSegments.includes(segment)}
-            aria-pressed={!hiddenSegments.includes(segment)}
-            on:click={() => toggleSegment(segment)}
-          >
-            {segment}
-          </button>
-        {/each}
-      </div>
-    {/if}
+    <div class="plot-row">
+      <p class="axis-y">{yAxisLabel}</p>
+      <div class="chart-host" bind:this={chartEl} aria-label={chart.title}></div>
+    </div>
+    <p class="axis-x">{xAxisLabel}</p>
 
-    <div class="chart-host" bind:this={chartEl} aria-label={chart.title}></div>
-
-    <dl class="summary" aria-label="Chart summary">
-      {#each summaryItems(renderedChart) as item}
+    <dl class="summary" aria-label="Value summary">
+      {#each statsItems(chart) as item}
         <div>
           <dt>{item.label}</dt>
           <dd>{item.value}</dd>
@@ -201,46 +195,52 @@
     width: 100%;
     min-height: 100vh;
     padding: 16px;
-    background: transparent;
+    background: #edf6f9;
     color: #000;
   }
 
   header {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     text-align: center;
   }
 
-  .chart-host {
-    min-height: 260px;
-    margin-bottom: 14px;
+  .plot-row {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    align-items: center;
+    gap: 8px;
   }
 
-  .segments {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: -8px 0 12px;
-  }
-
-  .segments button {
-    border: 1px solid rgb(0 0 0 / 18%);
-    border-radius: 999px;
-    background: #fff;
-    color: #000;
-    padding: 4px 9px;
-    cursor: pointer;
+  .axis-y {
+    margin: 0;
+    justify-self: center;
     font-size: 12px;
-    font-weight: 700;
+    color: rgb(0 0 0 / 62%);
+    writing-mode: sideways-lr;
   }
 
-  .segments button.muted {
-    background: rgb(255 255 255 / 45%);
-    color: rgb(0 0 0 / 42%);
-    text-decoration: line-through;
+  .axis-x {
+    margin: -8px 18px 10px 36px;
+    text-align: center;
+    font-size: 12px;
+    color: rgb(0 0 0 / 62%);
+  }
+
+  .axis-y:empty,
+  .axis-x:empty {
+    display: none;
+  }
+
+  .axis-y:empty + .chart-host {
+    grid-column: 1 / -1;
+  }
+
+  .chart-host {
+    min-width: 0;
+    min-height: 260px;
   }
 
   .chart-host :global(svg),
@@ -273,37 +273,26 @@
     line-height: 1.2;
   }
 
-  span {
-    justify-self: start;
-    background: #fff;
-    border: 1px solid rgb(0 0 0 / 18%);
-    border-radius: 999px;
-    padding: 3px 8px;
-    font-size: 12px;
-    color: #000;
-  }
-
   .summary {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    margin: 10px auto 0;
+    max-width: 760px;
   }
 
   .summary div {
     min-width: 0;
-    background: rgb(255 255 255 / 76%);
-    border: 1px solid rgb(0 0 0 / 13%);
-    border-radius: 8px;
-    padding: 10px 12px;
+    display: flex;
+    gap: 4px;
+    color: rgb(0 0 0 / 48%);
   }
 
   dt {
-    margin-bottom: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: rgb(0 0 0 / 58%);
+    margin: 0;
+    font-size: 11px;
+    font-weight: 500;
   }
 
   dd {
@@ -311,8 +300,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 14px;
-    font-weight: 800;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(0 0 0 / 64%);
   }
 
   .status {

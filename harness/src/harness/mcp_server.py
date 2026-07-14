@@ -43,8 +43,9 @@ mcp = FastMCP(
         "before table discovery or querying. "
         "Analytics tools are read-only. "
         "Prefer chartable summaries: find categorical dimensions, numeric measures, and *_bucket time labels before "
-        "falling back to plain table output. Avoid exploratory query calls that only render row counts or schema "
-        "checks; use knowledge and describe_table for planning, then issue one chart-ready query. "
+        "falling back to plain table output. Do not preflight charts with row-count queries; use knowledge and "
+        "describe_table for planning, then issue one chart-ready query. If that query returns no rows, report the "
+        "empty result and the table surface it came from instead of retrying row counts. "
         "Query results return a Markdown table or an MCP App chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),
@@ -129,7 +130,7 @@ def query(
         "auto", "line", "bar", "heatmap", "scatter", "bubble", "histogram", "box", "table"
     ] = "auto",
 ) -> CallToolResult:
-    """After reading relevant knowledge, run read-only SQL. Use x, y, optional group/size columns for richer charts."""
+    """Run one read-only, chart-ready SQL query after reading relevant knowledge. Do not use this for row-count preflights."""
     columns, rows, truncated = execute_readonly(sql, MAX_QUERY_ROWS)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
     structured: dict[str, object] = {

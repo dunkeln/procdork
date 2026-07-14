@@ -27,6 +27,9 @@ export function createPlotRenderer(Plot: PlotModule) {
 
 function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
   if (chart.chart_kind === "heatmap") return renderHeatmap(Plot, target, chart);
+  if (chart.chart_kind === "scatter" || chart.chart_kind === "bubble") return renderScatter(Plot, target, chart);
+  if (chart.chart_kind === "histogram") return renderHistogram(Plot, target, chart);
+  if (chart.chart_kind === "box") return renderBox(Plot, target, chart);
 
   const markOptions = {
     x: chart.dimension,
@@ -81,6 +84,83 @@ function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel
               inset: 2,
             }),
           ],
+  } satisfies PlotOptions);
+}
+
+function renderScatter(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
+  return Plot.plot({
+    width: plotWidth(target),
+    height: 260,
+    marginTop: 12,
+    marginRight: 18,
+    marginBottom: 48,
+    marginLeft: 54,
+    x: { grid: true, label: null },
+    y: { grid: true, label: null },
+    r: chart.size ? { range: [3, 16] } : undefined,
+    color: chart.series ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS } : undefined,
+    style: plotStyle(),
+    marks: [
+      Plot.dot(chart.data, {
+        x: chart.dimension,
+        y: chart.value,
+        r: chart.size ?? 4,
+        fill: chart.series ?? SERIES_COLORS[0],
+        stroke: "#fff",
+        strokeWidth: 0.8,
+        fillOpacity: 0.72,
+        title: tooltip(chart),
+      }),
+    ],
+  } satisfies PlotOptions);
+}
+
+function renderHistogram(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
+  return Plot.plot({
+    width: plotWidth(target),
+    height: 260,
+    marginTop: 12,
+    marginRight: 18,
+    marginBottom: 48,
+    marginLeft: 54,
+    x: { grid: true, label: null },
+    y: { grid: true, label: null },
+    style: plotStyle(),
+    marks: [
+      Plot.ruleY([0]),
+      Plot.rectY(
+        chart.data,
+        Plot.binX({ y: "count" }, { x: chart.value }),
+      ),
+    ],
+  } satisfies PlotOptions);
+}
+
+function renderBox(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
+  const grouped = chart.series != null;
+  return Plot.plot({
+    width: Math.max(plotWidth(target), 420),
+    height: 260,
+    marginTop: 42,
+    marginRight: 18,
+    marginBottom: 48,
+    marginLeft: 54,
+    x: { label: null },
+    y: { grid: true, label: null },
+    fx: grouped ? { label: null } : undefined,
+    color: grouped ? { label: displayLabel(chart.series as string), legend: true, range: SERIES_COLORS } : undefined,
+    style: plotStyle(),
+    marks: [
+      Plot.ruleY([0]),
+      Plot.boxY(chart.data, {
+        x: grouped ? chart.series : chart.dimension,
+        fx: grouped ? chart.dimension : undefined,
+        y: chart.value,
+        fill: grouped ? chart.series : SERIES_COLORS[0],
+        stroke: grouped ? chart.series : SERIES_COLORS[0],
+        fillOpacity: 0.38,
+      }),
+    ],
   } satisfies PlotOptions);
 }
 

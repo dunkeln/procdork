@@ -33,4 +33,8 @@ Preview URL:
 ```text
 http://127.0.0.1:5180/mcp-app.html?mock=1
 http://127.0.0.1:5180/mcp-app.html?mock=heatmap
+http://127.0.0.1:5180/mcp-app.html?mock=scatter
+http://127.0.0.1:5180/mcp-app.html?mock=bubble
+http://127.0.0.1:5180/mcp-app.html?mock=histogram
+http://127.0.0.1:5180/mcp-app.html?mock=box
 ```

@@ -26,26 +26,20 @@ coverage as (
     cross join structured_suppliers
 )
 
-select 'observed evidence' as coverage_stage, 'source domains' as coverage_metric, observed_domain_count as coverage_value
+select metric.coverage_stage, metric.coverage_metric, metric.coverage_value
 from coverage
-union all
-select 'observed evidence', 'distinct cited sources', observed_source_count
-from coverage
-union all
-select 'observed evidence', 'source observations', source_observation_count
-from coverage
-union all
-select 'structured supplier facts', 'structured suppliers', structured_supplier_count
-from coverage
-union all
-select 'structured supplier facts', 'supplier claims', supplier_claim_count
-from coverage
-union all
-select 'structured supplier facts', 'open conflicts', open_conflict_count
-from coverage
-union all
-select
-    'coverage proxy',
-    'structured suppliers per 100 source domains',
-    round(domain_to_supplier_coverage_proxy * 100, 2)
-from coverage
+cross join lateral
+    (
+        values
+            ('observed evidence', 'source domains', observed_domain_count),
+            ('observed evidence', 'distinct cited sources', observed_source_count),
+            ('observed evidence', 'source observations', source_observation_count),
+            ('structured supplier facts', 'structured suppliers', structured_supplier_count),
+            ('structured supplier facts', 'supplier claims', supplier_claim_count),
+            ('structured supplier facts', 'open conflicts', open_conflict_count),
+            (
+                'coverage proxy',
+                'structured suppliers per 100 source domains',
+                round(domain_to_supplier_coverage_proxy * 100, 2)
+            )
+    ) as metric(coverage_stage, coverage_metric, coverage_value)

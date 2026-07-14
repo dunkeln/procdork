@@ -15,14 +15,6 @@ with paired as (
       and human.evaluator_name in ('benchmark_human_judge', 'benchmark_operator_judge')
 ),
 
-dimensions as (
-    select *, 'grounding' as dimension from paired
-    union all select *, 'task_resolution' from paired
-    union all select *, 'uncertainty_calibration' from paired
-    union all select *, 'decision_usefulness' from paired
-    union all select *, 'clarity' from paired
-),
-
 scores as (
     select
         run_id,
@@ -32,7 +24,16 @@ scores as (
         dimension,
         cast(json_extract(machine_metadata, '$.scores.' || dimension) as integer) as machine_score,
         cast(json_extract(human_metadata, '$.scores.' || dimension) as integer) as human_score
-    from dimensions
+    from paired
+    cross join lateral
+        (
+            values
+                ('grounding'),
+                ('task_resolution'),
+                ('uncertainty_calibration'),
+                ('decision_usefulness'),
+                ('clarity')
+        ) as dimensions(dimension)
 )
 
 select

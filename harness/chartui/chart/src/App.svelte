@@ -36,7 +36,7 @@
   onMount(() => {
     const mock = new URLSearchParams(window.location.search).get("mock");
     if (mock !== null) {
-      setChart(normalizeChartPayload(mock === "heatmap" ? heatmapMock() : mock === "band" ? bandMock() : barMock()));
+      chart = normalizeChartPayload(mockPayload(mock));
       status = "Mock result";
       return;
     }
@@ -44,7 +44,7 @@
     app = new McpApp({ name: "Procdork Chart", version: "0.1.0" });
 
     app.ontoolresult = (toolResult) => {
-      setChart(normalizeChartPayload(toolResult.structuredContent ?? {}));
+      chart = normalizeChartPayload(toolResult.structuredContent ?? {});
       status = chart ? "Ready" : "No chartable result";
     };
 
@@ -65,6 +65,16 @@
   });
 
   onDestroy(() => resizeObserver?.disconnect());
+
+  function mockPayload(mock: string) {
+    if (mock === "heatmap") return heatmapMock();
+    if (mock === "band") return bandMock();
+    if (mock === "scatter") return scatterMock();
+    if (mock === "bubble") return bubbleMock();
+    if (mock === "histogram") return histogramMock();
+    if (mock === "box") return boxMock();
+    return barMock();
+  }
 
   function barMock() {
     return {
@@ -143,6 +153,75 @@
     };
   }
 
+  function scatterMock() {
+    const rows = Array.from({ length: 42 }, (_, index) => [
+      80 + index * 12,
+      2.2 + Math.sin(index / 5) + index / 34,
+      index % 2 ? "harness" : "raw_sql",
+    ]);
+    return {
+      title: "Latency vs Quality",
+      chart_kind: "scatter",
+      columns: ["elapsed_ms", "quality_score", "treatment"],
+      rows,
+      facts: { row_count: rows.length, column_count: 3, truncated: false },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function bubbleMock() {
+    return {
+      title: "Supplier Evidence Tradeoff",
+      chart_kind: "bubble",
+      columns: ["evidence_source_count", "claim_count", "open_conflict_count", "supplier_confidence"],
+      rows: [
+        [1, 5, 0, "medium"],
+        [1, 6, 2, "medium"],
+        [3, 11, 1, "high"],
+        [4, 8, 0, "high"],
+        [2, 4, 3, "low"],
+      ],
+      facts: { row_count: 5, column_count: 4, truncated: false },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function histogramMock() {
+    const rows = Array.from({ length: 120 }, (_, index) => [240 + Math.sin(index * 1.7) * 90 + (index % 9) * 45]);
+    return {
+      title: "Session Duration Distribution",
+      chart_kind: "histogram",
+      columns: ["duration_seconds"],
+      rows,
+      facts: { row_count: rows.length, column_count: 1, truncated: false },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
+  function boxMock() {
+    const rows = ["harness", "raw_sql", "operator"].flatMap((treatment, treatmentIndex) =>
+      ["sourcing", "quality"].flatMap((caseFamily, familyIndex) =>
+        Array.from({ length: 18 }, (_, index) => [
+          caseFamily,
+          treatment,
+          500 + treatmentIndex * 260 + familyIndex * 140 + Math.sin(index * 1.9) * 120,
+        ]),
+      ),
+    );
+    return {
+      title: "Elapsed Time by Treatment",
+      chart_kind: "box",
+      columns: ["case_family", "treatment", "elapsed_ms"],
+      rows,
+      facts: { row_count: rows.length, column_count: 3, truncated: false },
+      key_facts: [],
+      truncated: false,
+    };
+  }
+
   function statsItems(view: ChartViewModel): StatItem[] {
     const values = view.data
       .map((datum) => finiteNumber(datum[view.value]))
@@ -167,10 +246,6 @@
 
   function formatNumber(value: number): string {
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
-  }
-
-  function setChart(view: ChartViewModel | null): void {
-    chart = view;
   }
 
   function quantile(values: number[], q: number): number {

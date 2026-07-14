@@ -1,4 +1,4 @@
-export type ChartKind = "line" | "bar" | "heatmap" | "table";
+export type ChartKind = "line" | "bar" | "heatmap" | "scatter" | "bubble" | "histogram" | "box" | "table";
 export type HeatmapMode = "auto" | "categorical" | "continuous" | "calendar";
 export type ChartCell = string | number | boolean | null;
 
@@ -33,6 +33,7 @@ export type ChartViewModel = ChartPayload & {
   dimension: string;
   value: string;
   series?: string;
+  size?: string;
   lower?: string;
   upper?: string;
 };
@@ -56,6 +57,13 @@ export function normalizeChartPayload(input: unknown): ChartViewModel | null {
   });
 
   const banded = chart_kind === "line" && columns.length >= 5;
+  const dimension = columns[0];
+  const value =
+    chart_kind === "line" && banded
+      ? columns[2]
+      : chart_kind === "scatter" || chart_kind === "bubble"
+        ? columns[1]
+        : columns[columns.length - 1];
   return {
     title: typeof raw.title === "string" && raw.title.trim() ? raw.title : "Analytics result",
     chart_kind,
@@ -66,9 +74,10 @@ export function normalizeChartPayload(input: unknown): ChartViewModel | null {
     truncated: raw.truncated === true,
     heatmap_mode: heatmapMode(raw.heatmap_mode),
     data,
-    dimension: columns[0],
-    value: banded ? columns[2] : columns[columns.length - 1],
-    series: columns.length >= 3 ? columns[1] : undefined,
+    dimension,
+    value,
+    series: seriesColumn(chart_kind, columns),
+    size: chart_kind === "bubble" ? columns[2] : undefined,
     lower: banded ? columns[3] : undefined,
     upper: banded ? columns[4] : undefined,
   };
@@ -100,9 +109,23 @@ function chartFacts(
 }
 
 function chartKind(value: unknown): ChartKind {
-  return value === "line" || value === "bar" || value === "heatmap" || value === "table"
+  return value === "line" ||
+    value === "bar" ||
+    value === "heatmap" ||
+    value === "scatter" ||
+    value === "bubble" ||
+    value === "histogram" ||
+    value === "box" ||
+    value === "table"
     ? value
     : "table";
+}
+
+function seriesColumn(kind: ChartKind, columns: string[]): string | undefined {
+  if (kind === "scatter") return columns[2];
+  if (kind === "bubble") return columns[3];
+  if (kind === "box") return columns.length >= 3 ? columns[1] : undefined;
+  return columns.length >= 3 ? columns[1] : undefined;
 }
 
 function heatmapMode(value: unknown): HeatmapMode | undefined {

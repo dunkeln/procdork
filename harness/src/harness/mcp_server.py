@@ -125,10 +125,12 @@ def read_knowledge(path: str = "index") -> str:
 def query(
     sql: str,
     title: str = "Analytics result",
-    chart_kind: Literal["auto", "line", "bar", "heatmap", "table"] = "auto",
+    chart_kind: Literal[
+        "auto", "line", "bar", "heatmap", "scatter", "bubble", "histogram", "box", "table"
+    ] = "auto",
 ) -> CallToolResult:
-    """After reading relevant knowledge, run read-only SQL. Use category, segment, value for segmented or heatmap charts."""
-    columns, rows, truncated = execute_readonly(sql, 25)
+    """After reading relevant knowledge, run read-only SQL. Use x, y, optional group/size columns for richer charts."""
+    columns, rows, truncated = execute_readonly(sql, MAX_QUERY_ROWS)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
     structured: dict[str, object] = {
         "title": payload.title,

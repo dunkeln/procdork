@@ -28,9 +28,6 @@
 			"framework": "fastapi",
 			"routes": [
 				{
-					"src": "/charts/(.*)"
-				},
-				{
 					"src": "/mcp(.*)",
 					"transforms": [
 						{
@@ -48,7 +45,6 @@
 	},
 	"rewrites": [
 		{ "source": "/svc/ingestion/(.*)", "destination": { "service": "ingestion" } },
-		{ "source": "/charts/(.*)", "destination": { "service": "harness" } },
 		{ "source": "/mcp(.*)", "destination": { "service": "harness" } },
 		{
 			"source": "/.well-known/oauth-protected-resource/mcp",

@@ -5,6 +5,7 @@ pitch.md
 .env
 .env.*
 !.env.example
+.logfire/
 .agents/
 .codex/memories/
 
@@ -21,6 +22,7 @@ harness/e2e/benchmarks/evidence/
 harness/e2e/benchmarks/charts/
 harness/transforms/dbt/logs/
 harness/transforms/dbt/target/
+tests/artifacts/
 
 # JavaScript/Svelte
 node_modules/

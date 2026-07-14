@@ -148,8 +148,7 @@ prove that a workflow engine is necessary.
 | `MOTHERDUCK_TOKEN` | Server-side MotherDuck credential |
 | `DATABASE_URL` | Source Postgres connection used by the Neon connector |
 | `WORKOS_AUTHKIT_DOMAIN` | WorkOS issuer for OAuth-protected MCP |
-| `MCP_RESOURCE_URL` | Public MCP resource URL used by OAuth and chart links |
-| `CHART_SIGNING_KEY` | Encrypts short-lived stateless chart payloads |
+| `MCP_RESOURCE_URL` | Public MCP resource URL used by OAuth |
 | `MCP_MAX_QUERY_ROWS` | Maximum rows fetched by read-only execution |
 | `HOST`, `PORT` | MCP HTTP bind address |
 

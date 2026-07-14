@@ -1,57 +1,29 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64encode
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime
 from decimal import Decimal
-from hashlib import sha256
-from io import BytesIO
 from math import isfinite
-import os
-from pathlib import Path
-from tempfile import gettempdir
 from typing import Literal
 
-from cryptography.fernet import Fernet, InvalidToken
-from lets_plot import (
-    aes,
-    element_rect,
-    element_text,
-    geom_bar,
-    geom_line,
-    geom_point,
-    geom_tile,
-    ggplot,
-    labs,
-    scale_color_manual,
-    scale_fill_manual,
-    scale_fill_gradient,
-    theme,
-)
 from pydantic import BaseModel
 
 
 ChartKind = Literal["auto", "line", "bar", "heatmap", "table"]
-CHART_TTL_SECONDS = 15 * 60
 
 
-def configure_chart_fonts() -> None:
-    if "FONTCONFIG_FILE" in os.environ:
-        return
-    font_directory = Path(__file__).parent / "fonts"
-    config = Path(gettempdir()) / "procdork-fonts.conf"
-    config.write_text(
-        '<?xml version="1.0"?>\n'
-        '<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n'
-        "<fontconfig>\n"
-        f"  <dir>{font_directory}</dir>\n"
-        f"  <cachedir>{Path(gettempdir()) / 'procdork-font-cache'}</cachedir>\n"
-        "</fontconfig>\n",
-        encoding="utf-8",
-    )
-    os.environ["FONTCONFIG_FILE"] = str(config)
+class ChartMaxGroup(BaseModel):
+    label: str
+    value: float
 
 
-configure_chart_fonts()
+class ChartFacts(BaseModel):
+    row_count: int
+    column_count: int
+    group_count: int | None = None
+    segment_count: int | None = None
+    total: float | None = None
+    max_group: ChartMaxGroup | None = None
+    truncated: bool = False
 
 
 class ChartPayload(BaseModel):
@@ -59,6 +31,7 @@ class ChartPayload(BaseModel):
     chart_kind: Literal["line", "bar", "heatmap", "table"]
     columns: list[str]
     rows: list[list[str | int | float | bool | None]]
+    facts: ChartFacts
     key_facts: list[str]
     truncated: bool
 
@@ -102,7 +75,8 @@ def build_chart(
         chart_kind=kind,
         columns=selected_columns,
         rows=normalized_rows,
-        key_facts=facts,
+        facts=facts,
+        key_facts=chart_fact_text(facts, selected_columns, kind),
         truncated=truncated,
     )
 
@@ -148,138 +122,64 @@ def chart_facts(
     columns: list[str],
     rows: list[list[str | int | float | bool | None]],
     truncated: bool,
-) -> list[str]:
+) -> ChartFacts:
     if kind == "table":
-        row_label = "row" if len(rows) == 1 else "rows"
-        facts = [f"{len(rows)} {row_label} shown across {len(columns)} columns."]
-    else:
-        value_index = len(columns) - 1
-        points = [
-            (str(row[0]), float(row[value_index]))
-            for row in rows
-            if isinstance(row[value_index], (int, float))
-        ]
-        measure = columns[value_index]
-        if len(columns) == 3:
-            totals: dict[str, float] = {}
-            for label, value in points:
-                totals[label] = totals.get(label, 0) + value
-            highest = max(totals.items(), key=lambda point: point[1])
-            facts = [
-                f"{len(points)} points plotted across {len({str(row[1]) for row in rows})} segments.",
-                f"Highest total {measure}: {number(highest[1])} at {highest[0]}.",
-                f"Displayed total {measure}: {number(sum(value for _, value in points))}.",
-            ]
-        else:
-            highest = max(points, key=lambda point: point[1])
-            facts = [
-                f"{len(points)} points plotted.",
-                f"Highest {measure}: {number(highest[1])} at {highest[0]}.",
-                f"Displayed total {measure}: {number(sum(value for _, value in points))}.",
-            ]
-        if kind == "line" and len(points) > 1 and len(columns) == 2:
-            start, end = points[0][1], points[-1][1]
-            change = (
-                f"{number(end - start)} absolute"
-                if start == 0
-                else f"{number((end - start) / abs(start) * 100)}%"
-            )
-            facts.append(
-                f"{columns[1]} changed from {number(start)} to {number(end)} ({change})."
-            )
-    if truncated:
-        facts.append("The rendered dataset was truncated to the chart limit.")
-    return facts
-
-
-def encode_chart(payload: ChartPayload) -> tuple[str, str]:
-    token = cipher().encrypt(payload.model_dump_json().encode()).decode()
-    expires_at = datetime.now(UTC) + timedelta(seconds=CHART_TTL_SECONDS)
-    return token, expires_at.isoformat()
-
-
-def decode_chart(token: str) -> ChartPayload:
-    try:
-        content = cipher().decrypt(token.encode(), ttl=CHART_TTL_SECONDS)
-        return ChartPayload.model_validate_json(content)
-    except (InvalidToken, ValueError) as error:
-        raise ValueError("Chart link is invalid or expired") from error
-
-
-def render_png(payload: ChartPayload) -> bytes:
-    if payload.chart_kind == "table":
-        raise ValueError("Tables render as Markdown, not PNG")
-
-    segmented = len(payload.columns) == 3
-    data = {
-        "label": [str(row[0]) for row in payload.rows],
-        "value": [float(row[-1]) for row in payload.rows],
-        "series": [str(row[1]) for row in payload.rows]
-        if segmented
-        else [payload.columns[1]] * len(payload.rows),
-    }
-    if payload.chart_kind == "heatmap":
-        plot = ggplot(data, aes("label", "series", fill="value")) + geom_tile()
-        plot += scale_fill_gradient(low="#b8b8ff", high="#ce4257") + labs(
-            title=payload.title,
-            x=payload.columns[0],
-            y=payload.columns[1],
-            fill=payload.columns[2],
+        return ChartFacts(row_count=len(rows), column_count=len(columns), truncated=truncated)
+    value_index = len(columns) - 1
+    points = [
+        (str(row[0]), float(row[value_index]))
+        for row in rows
+        if isinstance(row[value_index], (int, float))
+    ]
+    total = sum(value for _, value in points)
+    if len(columns) == 3:
+        totals: dict[str, float] = {}
+        for label, value in points:
+            totals[label] = totals.get(label, 0) + value
+        highest = max(totals.items(), key=lambda point: point[1])
+        return ChartFacts(
+            row_count=len(points),
+            column_count=len(columns),
+            group_count=len(totals),
+            segment_count=len({str(row[1]) for row in rows}),
+            total=total,
+            max_group=ChartMaxGroup(label=highest[0], value=highest[1]),
+            truncated=truncated,
         )
-    else:
-        colors = segment_palette(len(set(data["series"])))
-        plot = ggplot(data, aes("label", "value", group="series"))
-        if payload.chart_kind == "line":
-            plot += (
-                geom_line(aes(color="series"), size=1.2)
-                + geom_point(aes(color="series"), size=4)
-                + scale_color_manual(values=colors)
-                if segmented
-                else geom_line(color="#b8b8ff", size=1.2)
-                + geom_point(color="#b8b8ff", size=4)
-            )
-        else:
-            plot += (
-                geom_bar(aes(fill="series"), stat="identity", width=0.65)
-                + scale_fill_manual(values=colors)
-                if segmented
-                else geom_bar(stat="identity", fill="#b8b8ff", width=0.65)
-            )
-        plot += labs(
-            title=payload.title,
-            x=payload.columns[0],
-            y=payload.columns[-1],
-            color=payload.columns[1],
-            fill=payload.columns[1],
-        )
-
-    image = BytesIO()
-    themed(plot).to_png(image, w=960, h=540, unit="px")
-    return image.getvalue()
-
-
-def themed(plot):
-    return plot + theme(
-        text=element_text(family="Roboto"),
-        axis_text_x=element_text(angle=30, hjust=1),
-        legend_position="bottom",
-        panel_background=element_rect(fill="#ffffff"),
-        plot_background=element_rect(fill="#ffffff"),
-        plot_title=element_text(size=20, face="bold"),
+    highest = max(points, key=lambda point: point[1])
+    return ChartFacts(
+        row_count=len(points),
+        column_count=len(columns),
+        group_count=len(points),
+        total=total,
+        max_group=ChartMaxGroup(label=highest[0], value=highest[1]),
+        truncated=truncated,
     )
 
 
-def segment_palette(count: int) -> list[str]:
-    start, end = (184, 184, 255), (206, 66, 87)
-    steps = max(count - 1, 1)
-    return [
-        "#"
-        + "".join(
-            f"{round(a + (b - a) * index / steps):02x}"
-            for a, b in zip(start, end)
-        )
-        for index in range(count)
-    ]
+def chart_fact_text(
+    facts: ChartFacts, columns: list[str], kind: str
+) -> list[str]:
+    if kind == "table":
+        row_label = "row" if facts.row_count == 1 else "rows"
+        text = [f"{facts.row_count} {row_label} shown across {facts.column_count} columns."]
+    else:
+        measure = columns[-1]
+        if facts.segment_count is not None:
+            text = [
+                f"{facts.row_count} points plotted across {facts.segment_count} segments.",
+            ]
+        else:
+            text = [f"{facts.row_count} points plotted."]
+        if facts.max_group:
+            text.append(
+                f"Highest total {measure}: {number(facts.max_group.value)} at {facts.max_group.label}."
+            )
+        if facts.total is not None:
+            text.append(f"Displayed total {measure}: {number(facts.total)}.")
+    if facts.truncated:
+        text.append("The rendered dataset was truncated to the chart limit.")
+    return text
 
 
 def render_markdown_table(payload: ChartPayload) -> str:
@@ -292,14 +192,6 @@ def render_markdown_table(payload: ChartPayload) -> str:
 
     lines = [payload.columns, ["---"] * len(payload.columns), *payload.rows]
     return "\n".join(f"| {' | '.join(cell(value) for value in row)} |" for row in lines)
-
-
-# Encrypt chart payloads so public links stay stateless, private, and tamper-evident.
-def cipher() -> Fernet:
-    secret = os.getenv("CHART_SIGNING_KEY", "")
-    if len(secret) < 32:
-        raise RuntimeError("CHART_SIGNING_KEY must contain at least 32 characters")
-    return Fernet(urlsafe_b64encode(sha256(secret.encode()).digest()))
 
 
 def json_value(value: object) -> str | int | float | bool | None:

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from base64 import b64encode
 import os
 from pathlib import Path
 from typing import Callable, Literal
-from urllib.parse import urlsplit
 
 from duckdb import DuckDBPyConnection, StatementType
 from mcp.server.fastmcp import FastMCP
@@ -12,25 +10,23 @@ from mcp.types import (
     Annotations,
     CallToolResult,
     Icon,
-    ImageContent,
     TextContent,
     ToolAnnotations,
 )
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import PlainTextResponse
 
 from .charts import (
     build_chart,
-    decode_chart,
-    encode_chart,
     render_markdown_table,
-    render_png,
 )
 from .connectors.workos import workos_auth
 from .olap import connect_duckdb, load_dotenv_once
 
 
 KNOWLEDGE_ROOT = Path(__file__).parent / "knowledge"
+CHART_APP = Path(__file__).parents[2] / "mcp_apps" / "chart" / "dist" / "mcp-app.html"
+CHART_APP_URI = "ui://charts/result"
 MAX_QUERY_ROWS = int(os.getenv("MCP_MAX_QUERY_ROWS", "500"))
 READ_ONLY = ToolAnnotations(
     readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
@@ -45,7 +41,7 @@ mcp = FastMCP(
         "are available; otherwise call read_knowledge with path='index'. Follow only the relevant knowledge links "
         "before table discovery or querying. "
         "Analytics tools are read-only. "
-        "Query results return a Markdown table or an ephemeral chart plus deterministic key facts. "
+        "Query results return a Markdown table or an MCP App chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
     ),
     icons=[
@@ -86,6 +82,16 @@ for knowledge_path in sorted(KNOWLEDGE_ROOT.rglob("*.md")):
     )(reader(knowledge_path))
 
 
+mcp.resource(
+    CHART_APP_URI,
+    name="chart_result",
+    title="Analytics chart",
+    description="Displays the chart returned by the analytics query tool.",
+    mime_type="text/html;profile=mcp-app",
+    meta={"ui": {"prefersBorder": False}},
+)(reader(CHART_APP))
+
+
 @mcp.tool(
     title="Read knowledge first",
     annotations=READ_ONLY,
@@ -107,6 +113,10 @@ def read_knowledge(path: str = "index") -> str:
 @mcp.tool(
     title="Query analytics",
     annotations=READ_ONLY,
+    meta={
+        "ui": {"resourceUri": CHART_APP_URI},
+        "ui/resourceUri": CHART_APP_URI,
+    },
 )
 def query(
     sql: str,
@@ -119,32 +129,21 @@ def query(
     structured: dict[str, object] = {
         "title": payload.title,
         "chart_kind": payload.chart_kind,
+        "columns": payload.columns,
+        "rows": payload.rows,
+        "facts": payload.facts.model_dump(mode="json"),
         "key_facts": payload.key_facts,
         "truncated": payload.truncated,
     }
     if payload.chart_kind == "table":
         result = render_markdown_table(payload)
     else:
-        token, expires_at = encode_chart(payload)
-        chart_url = f"{public_origin()}/charts/{token}.png"
-        result = f"![{payload.title}]({chart_url})"
-        structured.update(chart_url=chart_url, expires_at=expires_at)
+        result = "The associated MCP App renders this chart."
     markdown = "\n".join(
         [payload.title, "", result, "", *(f"- {fact}" for fact in payload.key_facts)]
     )
-    if payload.chart_kind == "table":
-        content = [TextContent(type="text", text=markdown)]
-    else:
-        content = [
-            TextContent(type="text", text=markdown),
-            ImageContent(
-                type="image",
-                data=b64encode(render_png(payload)).decode(),
-                mimeType="image/png",
-            ),
-        ]
     return CallToolResult(
-        content=content,
+        content=[TextContent(type="text", text=markdown)],
         structuredContent=structured,
     )
 
@@ -253,30 +252,6 @@ def quoted(identifier: str) -> str:
 @mcp.custom_route("/health", methods=["GET"])
 async def health(_: Request) -> PlainTextResponse:
     return PlainTextResponse("ok")
-
-
-@mcp.custom_route("/charts/{token}.png", methods=["GET"])
-async def chart(request: Request) -> Response:
-    try:
-        payload = decode_chart(request.path_params["token"])
-        png = render_png(payload)
-    except ValueError as error:
-        return PlainTextResponse(str(error), status_code=404)
-    return Response(
-        png,
-        media_type="image/png",
-        headers={
-            "Cache-Control": "private, max-age=300",
-            "Content-Disposition": "inline",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
-
-
-def public_origin() -> str:
-    resource = os.getenv("MCP_RESOURCE_URL") or "http://localhost:8000/mcp"
-    parsed = urlsplit(resource)
-    return f"{parsed.scheme}://{parsed.netloc}"
 
 
 def serve() -> None:

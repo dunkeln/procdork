@@ -1,0 +1,11 @@
+[project]
+name = "procdork-tests"
+version = "0.1.0"
+description = "Root-level end-to-end test utilities for procdork"
+requires-python = ">=3.13"
+dependencies = [
+    "logfire>=4.0.0",
+]
+
+[tool.uv]
+package = false

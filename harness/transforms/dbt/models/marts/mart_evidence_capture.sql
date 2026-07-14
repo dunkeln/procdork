@@ -16,12 +16,10 @@ with evidence_links as (
 )
 
 select
-    'evidence_' || substr(md5(session_slug || '|' || evidence_type), 1, 16)
-        as evidence_capture_id,
     session_slug,
     evidence_type,
     count(distinct source_url) as source_count,
     min(linked_at) as first_linked_at,
     max(linked_at) as last_linked_at
 from evidence_links
-group by 1, 2, 3
+group by 1, 2

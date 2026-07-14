@@ -3,6 +3,9 @@
 * [Capture Summary](capture_summary.md) - Capture volume grouped by source type and adapter.
 * [Chat Summary](chat_summary.md) - All-time counts for the currently loaded chat snapshot.
 * [Evidence Capture](evidence_capture.md) - Source coverage by session and evidence type.
+* [Workflow Sessions](workflow_sessions.md) - Session-level completion, tool effort, evidence volume, and latency.
+* [Tool Activity](tool_activity.md) - Tool usage volume and status by session and tool.
+* [Source Reach](source_reach.md) - Cited source-domain and evidence-type coverage.
 * [Evaluation Cases](evaluation_cases.md) - Latest evaluation outcome for each case and evaluator.
 * [Benchmark Runs](benchmark_runs.md) - Run-level quality, reliability, efficiency, and cost evidence.
 * [Benchmark Summary](benchmark_summary.md) - Comparable metrics by treatment and analytical behavior.

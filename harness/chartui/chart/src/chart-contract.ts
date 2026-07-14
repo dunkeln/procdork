@@ -1,4 +1,5 @@
 export type ChartKind = "line" | "bar" | "heatmap" | "table";
+export type HeatmapMode = "auto" | "categorical" | "continuous" | "calendar";
 export type ChartCell = string | number | boolean | null;
 
 export type ChartPayload = {
@@ -9,6 +10,7 @@ export type ChartPayload = {
   facts: ChartFacts;
   key_facts: string[];
   truncated: boolean;
+  heatmap_mode?: HeatmapMode;
 };
 
 export type ChartFacts = {
@@ -59,6 +61,7 @@ export function normalizeChartPayload(input: unknown): ChartViewModel | null {
     facts: chartFacts(raw.facts, columns, rows, raw.truncated === true),
     key_facts: stringArray(raw.key_facts),
     truncated: raw.truncated === true,
+    heatmap_mode: heatmapMode(raw.heatmap_mode),
     data,
     dimension: columns[0],
     value: columns[columns.length - 1],
@@ -95,6 +98,12 @@ function chartKind(value: unknown): ChartKind {
   return value === "line" || value === "bar" || value === "heatmap" || value === "table"
     ? value
     : "table";
+}
+
+function heatmapMode(value: unknown): HeatmapMode | undefined {
+  return value === "auto" || value === "categorical" || value === "continuous" || value === "calendar"
+    ? value
+    : undefined;
 }
 
 function stringArray(value: unknown): string[] {

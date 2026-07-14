@@ -158,29 +158,36 @@ One kind of reuse has been measured. Across 24 completed adversarial workflows,
 <details>
 <summary><strong>Public Cost Study</strong></summary>
 
-Public pricing pages suggest the harness has a much lower operating floor than
-a managed warehouse plus transformation plus AI-BI stack for this workload.
-This is a study from published prices, not an invoice or vendor benchmark.
+Public pricing pages suggest the harness has a lower operating floor than a
+managed warehouse plus platform-native AI-BI stack for this workload. This is a
+study from published prices, not an invoice or vendor benchmark.
 
-An AWS deployment with one small public MCP service, one scheduled refresh task,
-EventBridge Scheduler, S3, ECR, CloudWatch logs, and an application load
-balancer is plausibly a tens-to-low-hundreds monthly system. The scheduler line
-item is effectively zero at this scale because EventBridge Scheduler includes
-14 million monthly invocations in the free tier. The fixed AWS tax is more
-likely to be the public load balancer than the scheduled harness job.
+The harness shape here is AWS runtime plus MotherDuck OLAP plus dbt Core. dbt
+Core is open-source transform code in the repository; dbt Cloud seats and
+managed dbt billing are not part of this harness estimate.
+
+An AWS deployment with one small public MCP service, one scheduled refresh
+task, EventBridge Scheduler, S3, ECR, CloudWatch logs, and an application load
+balancer is plausibly a tens-to-low-hundreds monthly system before the OLAP
+platform. The scheduler line item is effectively zero at this scale because
+EventBridge Scheduler includes 14 million monthly invocations in the free tier.
+The fixed AWS tax is more likely to be the public load balancer than the
+scheduled harness job.
 
 | Operating shape | Plausible monthly floor |
 |---|---:|
-| Harness on AWS Fargate, public MCP, scheduler, light logs/storage | `$60-$180` |
-| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, plus three dbt Cloud developer seats | `$1,000-$1,800+` |
-| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, plus three dbt Cloud developer seats | `$1,700-$3,200+` |
+| Harness on AWS Fargate plus MotherDuck Lite, if the workload fits included storage and Pulse compute | `$60-$180` |
+| Harness on AWS Fargate plus MotherDuck Business, before heavy compute usage | `$310-$500+` |
+| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, using dbt Core outside Snowflake | `$400-$1,500+` |
+| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, using dbt Core outside Snowflake | `$1,400-$2,900+` |
 
 The Snowflake estimate uses public Enterprise pricing around `$3` per credit,
 Gen1 warehouse rates of 1 credit/hour for X-Small, 2 credits/hour for Small,
-and 4 credits/hour for Medium, plus dbt Cloud Starter pricing of `$100` per
-developer seat per month. Cortex, Snowflake Intelligence, Genie, Databricks SQL
-warehouse usage, storage, egress, support, and enterprise discounts are not
-included in those rows.
+and 4 credits/hour for Medium. The MotherDuck Business estimate starts with the
+public `$250` per organization monthly platform price, then adds the AWS runtime
+floor. MotherDuck usage, storage, read scaling, AI units, Snowflake Cortex,
+Snowflake Intelligence, Databricks SQL warehouse usage, storage, egress,
+support, and enterprise discounts are not included in those rows.
 
 The important cost claim is not that the harness removes AI spend. It redirects
 it. Managed warehouse AI features can charge inside the data platform while the
@@ -199,6 +206,10 @@ user-facing agent layer where the user already intended to spend it.
 * [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing/) - per-second container compute pricing for requested vCPU, memory, and storage.
 * [Amazon EventBridge pricing](https://aws.amazon.com/eventbridge/pricing/) - Scheduler free tier and per-invocation pricing.
 * [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) - public load balancer hourly and capacity-unit pricing.
+
+### MotherDuck
+
+* [MotherDuck pricing](https://motherduck.com/product/pricing/) - Lite, Business, storage, compute instance, read-scaling, and AI Unit pricing.
 
 ### Snowflake
 
@@ -221,7 +232,9 @@ user-facing agent layer where the user already intended to spend it.
 
 ### dbt
 
-* [dbt billing](https://docs.getdbt.com/docs/platform/billing) - seat pricing, successful model billing, Semantic Layer queried metrics, and dbt State usage.
+* [Install dbt locally](https://docs.getdbt.com/docs/local/install-dbt) - local dbt Core installation paths for repository-owned transform code.
+* [dbt Core repository](https://github.com/dbt-labs/dbt-core) - Apache-2.0 licensed dbt Core source.
+* [dbt billing](https://docs.getdbt.com/docs/platform/billing) - optional dbt platform seat, model, Semantic Layer, and dbt State billing; not part of the harness floor above.
 
 ### Open Knowledge Format
 

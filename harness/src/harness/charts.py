@@ -3,12 +3,28 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from math import isfinite
+import re
 from typing import Literal
 
 from pydantic import BaseModel
 
 
 ChartKind = Literal["auto", "line", "bar", "heatmap", "table"]
+DISPLAY_TERMS = {
+    "id": "ID",
+    "moq": "MOQ",
+    "ms": "ms",
+    "p95": "P95",
+    "sha256": "SHA-256",
+    "sql": "SQL",
+    "url": "URL",
+    "usd": "USD",
+}
+OPAQUE_ID = re.compile(
+    r"(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|"
+    r"(?:[a-z]+_)?[0-9a-f]{16,})",
+    re.IGNORECASE,
+)
 
 
 class ChartMaxGroup(BaseModel):
@@ -48,9 +64,18 @@ def build_chart(
 
     kind = choose_chart_kind(columns, rows, requested_kind)
     if kind == "table":
-        selected_columns = columns[:6]
-        selected_rows = [list(row[:6]) for row in rows[:12]]
-        truncated = truncated or len(columns) > 6 or len(rows) > 12
+        visible = [
+            index
+            for index, column in enumerate(columns)
+            if not opaque_key_column(column, [row[index] for row in rows])
+        ]
+        selected = (visible or list(range(len(columns))))[:5]
+        selected_columns = ["row", *(columns[index] for index in selected)]
+        selected_rows = [
+            [number, *(row[index] for index in selected)]
+            for number, row in enumerate(rows[:12], start=1)
+        ]
+        truncated = truncated or len(visible or columns) > 5 or len(rows) > 12
     else:
         value_index = numeric_column(rows)
         if value_index is None or len(columns) < 2:
@@ -66,17 +91,23 @@ def build_chart(
             if segmented
             else [[row[0], row[value_index]] for row in rows[:12]]
         )
+        if opaque_key_column(selected_columns[0], [row[0] for row in selected_rows]):
+            selected_columns[0] = selected_columns[0].removesuffix("_id") + "_number"
+            selected_rows = [
+                [index, *row[1:]] for index, row in enumerate(selected_rows, start=1)
+            ]
         truncated = truncated or len(rows) > 12
 
+    display_columns = [display_name(column) for column in selected_columns]
     normalized_rows = [[json_value(value) for value in row] for row in selected_rows]
-    facts = chart_facts(kind, selected_columns, normalized_rows, truncated)
+    facts = chart_facts(kind, display_columns, normalized_rows, truncated)
     return ChartPayload(
         title=title.strip()[:80] or "Analytics result",
         chart_kind=kind,
-        columns=selected_columns,
+        columns=display_columns,
         rows=normalized_rows,
         facts=facts,
-        key_facts=chart_fact_text(facts, selected_columns, kind),
+        key_facts=chart_fact_text(facts, display_columns, kind),
         truncated=truncated,
     )
 
@@ -208,3 +239,23 @@ def json_value(value: object) -> str | int | float | bool | None:
 
 def number(value: float) -> str:
     return f"{value:,.2f}".rstrip("0").rstrip(".")
+
+
+def display_name(column: str) -> str:
+    words = [
+        DISPLAY_TERMS.get(word.lower(), word.lower()) for word in column.split("_")
+    ]
+    if words and words[0] not in DISPLAY_TERMS.values():
+        words[0] = words[0].capitalize()
+    return " ".join(words)
+
+
+def opaque_key_column(column: str, values: list[object]) -> bool:
+    populated = [value for value in values if value is not None]
+    return (
+        (column.lower() == "id" or column.lower().endswith("_id"))
+        and bool(populated)
+        and all(
+            isinstance(value, str) and OPAQUE_ID.fullmatch(value) for value in populated
+        )
+    )

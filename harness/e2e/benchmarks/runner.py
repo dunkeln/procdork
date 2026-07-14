@@ -11,7 +11,6 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from harness.charts import build_chart, render_svg
 from e2e.benchmarks.connectors.anthropic import JUDGE_PROMPT_VERSION, judge_response
 from e2e.benchmarks.evaluator import deterministic_evaluation, semantic_evaluation
 from harness.evaluations import record_evaluation
@@ -159,33 +158,6 @@ def reference_query(connection, sql: str | None) -> dict[str, object] | None:
         "rows": [list(row) for row in rows[:100]],
         "truncated": len(rows) > 100,
     }
-
-
-def write_charts(connection, output: Path) -> list[Path]:
-    output.mkdir(parents=True, exist_ok=True)
-    queries = {
-        "pass-rate.svg": (
-            "Deterministic pass rate by treatment",
-            "select treatment, avg(deterministic_pass_rate) from mart_benchmark_summary group by 1 order by 1",
-        ),
-        "elapsed-time.svg": (
-            "Median workflow time by treatment",
-            "select treatment, avg(median_elapsed_ms) from mart_benchmark_summary group by 1 order by 1",
-        ),
-        "semantic-score.svg": (
-            "Semantic score by treatment",
-            "select treatment, avg(average_semantic_score) from mart_benchmark_summary where average_semantic_score is not null group by 1 order by 1",
-        ),
-    }
-    written = []
-    for filename, (title, sql) in queries.items():
-        result = connection.execute(sql)
-        columns = [column[0] for column in result.description or []]
-        payload = build_chart(columns, result.fetchall(), title, "bar")
-        path = output / filename
-        path.write_text(render_svg(payload), encoding="utf-8")
-        written.append(path)
-    return written
 
 
 def run_agent(

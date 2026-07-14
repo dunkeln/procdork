@@ -6,7 +6,7 @@ resource: procdork://tables/evidence_capture
 tags: [evidence, sessions, transform]
 timestamp: 2026-07-13T00:00:00Z
 interpretations:
-  - "heatmap: compare source_count across session_slug and evidence_type"
+  - "heatmap: compare source_count across session_number and evidence_type"
   - "table: inspect exact first_linked_at and last_linked_at evidence bounds"
 ---
 
@@ -17,7 +17,8 @@ distinct source URLs support them.
 
 # Grain
 
-One row per `session_slug` and `evidence_type` pair.
+One row per `session_number` and `evidence_type` pair. `session_title` supplies
+the readable application label.
 
 # Measures
 

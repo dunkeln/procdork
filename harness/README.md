@@ -61,7 +61,7 @@ Knowledge documents are also exposed as MCP resources under
 `okf://bundle/...`.
 
 `query` returns a Markdown table when the result is not safely chartable.
-Otherwise it can render line, bar, segmented, or heatmap SVGs and return
+Otherwise it returns a structured chart payload for the MCP App and
 deterministic key facts. SQL performs the computation; the agent does not need
 to recalculate the result in chat.
 

@@ -17,7 +17,7 @@ from mcp.types import (
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from .charts import (
+from .chart_payload import (
     build_chart,
     render_markdown_table,
 )

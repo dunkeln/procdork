@@ -7,7 +7,7 @@ from time import perf_counter
 import click
 
 from e2e.benchmarks.evaluator import DIMENSIONS, human_evaluation, operator_evaluation
-from e2e.benchmarks.runner import load_cases, run_benchmark, write_charts
+from e2e.benchmarks.runner import load_cases, run_benchmark
 from harness.evaluations import (
     EvaluationResult,
     ensure_evaluation_table,
@@ -300,20 +300,6 @@ def benchmark_calibrate(
                     metadata={"scores": scores, "blind": True},
                 ),
             )
-
-
-@main.command("benchmark-charts")
-@click.option(
-    "--output",
-    type=click.Path(path_type=Path, file_okay=False),
-    default=Path("e2e/benchmarks/charts"),
-)
-@click.option("--duckdb-path", default=None)
-def benchmark_charts(output: Path, duckdb_path: str | None) -> None:
-    """Render three compact charts from published benchmark evidence."""
-    with connect_duckdb(duckdb_path) as connection:
-        paths = write_charts(connection, output)
-    click.echo("\n".join(str(path) for path in paths))
 
 
 @main.command("benchmark-verify")

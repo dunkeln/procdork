@@ -18,7 +18,8 @@ events were running, done, unknown, or errored.
 
 # Grain
 
-One row per `session_slug`, `tool_name`, `tool_label`, and `tool_status`.
+One row per `session_number`, `tool_name`, `tool_label`, and `tool_status`.
+`session_title` supplies the readable application label.
 
 # Measures
 

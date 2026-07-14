@@ -10,17 +10,20 @@
 
   let status = "Connecting...";
   let chart: ChartViewModel | null = null;
+  let hiddenSegments: string[] = [];
   let app: McpApp | null = null;
   let chartEl: HTMLDivElement;
   const renderer = createPlotRenderer(Plot);
 
-  $: if (chartEl && chart) {
-    renderer.render(chartEl, chart);
+  $: segmentOptions = chart ? chartSegments(chart) : [];
+  $: renderedChart = chart ? filterSegments(chart, hiddenSegments) : null;
+  $: if (chartEl && renderedChart) {
+    renderer.render(chartEl, renderedChart);
   }
 
   onMount(() => {
     if (new URLSearchParams(window.location.search).has("mock")) {
-      chart = normalizeChartPayload({
+      setChart(normalizeChartPayload({
         title: "Analytics",
         chart_kind: "bar",
         columns: ["evidence_type", "status", "count"],
@@ -47,7 +50,7 @@
           "Displayed total count: 54.",
         ],
         truncated: false,
-      });
+      }));
       status = "Mock result";
       return;
     }
@@ -55,7 +58,7 @@
     app = new McpApp({ name: "Procdork Chart", version: "0.1.0" });
 
     app.ontoolresult = (toolResult) => {
-      chart = normalizeChartPayload(toolResult.structuredContent ?? {});
+      setChart(normalizeChartPayload(toolResult.structuredContent ?? {}));
       status = chart ? "Ready" : "No chartable result";
     };
 
@@ -100,20 +103,87 @@
   function formatNumber(value: number): string {
     return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
   }
+
+  function setChart(view: ChartViewModel | null): void {
+    chart = view;
+    hiddenSegments = [];
+  }
+
+  function chartSegments(view: ChartViewModel): string[] {
+    if (!view.series || view.chart_kind === "heatmap" || view.chart_kind === "table") return [];
+    return Array.from(new Set(view.data.map((datum) => String(datum[view.series ?? ""] ?? "")))).filter(Boolean);
+  }
+
+  function toggleSegment(segment: string): void {
+    const hidden = hiddenSegments.includes(segment);
+    if (!hidden && segmentOptions.length - hiddenSegments.length <= 1) return;
+    hiddenSegments = hidden
+      ? hiddenSegments.filter((item) => item !== segment)
+      : [...hiddenSegments, segment];
+  }
+
+  function filterSegments(view: ChartViewModel, hiddenItems: string[]): ChartViewModel {
+    if (!view.series || hiddenItems.length === 0) return view;
+    const hidden = new Set(hiddenItems);
+    const seriesIndex = view.columns.indexOf(view.series);
+    const rows = view.rows.filter((row) => !hidden.has(String(row[seriesIndex] ?? "")));
+    const data = view.data.filter((datum) => !hidden.has(String(datum[view.series ?? ""] ?? "")));
+    return {
+      ...view,
+      rows,
+      data,
+      facts: {
+        ...view.facts,
+        row_count: rows.length,
+        group_count: view.facts.group_count === undefined ? undefined : new Set(data.map((datum) => datum[view.dimension])).size,
+        segment_count: view.facts.segment_count === undefined ? undefined : chartSegments({ ...view, data }).length,
+        total: view.facts.total === undefined ? undefined : data.reduce((sum, datum) => sum + numberValue(datum[view.value]), 0),
+        max_group: view.facts.max_group ? maxGroup(view, data) : undefined,
+      },
+    };
+  }
+
+  function maxGroup(view: ChartViewModel, data: ChartViewModel["data"]): ChartViewModel["facts"]["max_group"] {
+    const totals = new Map<string, number>();
+    data.forEach((datum) => {
+      const label = String(datum[view.dimension] ?? "");
+      totals.set(label, (totals.get(label) ?? 0) + numberValue(datum[view.value]));
+    });
+    return Array.from(totals, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)[0];
+  }
+
+  function numberValue(value: unknown): number {
+    return typeof value === "number" && Number.isFinite(value) ? value : 0;
+  }
 </script>
 
 <main class="shell">
-  {#if chart}
+  {#if chart && renderedChart}
     <header>
       <span>{chart.chart_kind}</span>
       <h1>Analytics</h1>
       <i aria-hidden="true"></i>
     </header>
 
+    {#if segmentOptions.length > 1}
+      <div class="segments" aria-label="Visible series">
+        {#each segmentOptions as segment}
+          <button
+            type="button"
+            class:muted={hiddenSegments.includes(segment)}
+            aria-pressed={!hiddenSegments.includes(segment)}
+            on:click={() => toggleSegment(segment)}
+          >
+            {segment}
+          </button>
+        {/each}
+      </div>
+    {/if}
+
     <div class="chart-host" bind:this={chartEl} aria-label={chart.title}></div>
 
     <dl class="summary" aria-label="Chart summary">
-      {#each summaryItems(chart) as item}
+      {#each summaryItems(renderedChart) as item}
         <div>
           <dt>{item.label}</dt>
           <dd>{item.value}</dd>
@@ -147,6 +217,30 @@
   .chart-host {
     min-height: 260px;
     margin-bottom: 14px;
+  }
+
+  .segments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -8px 0 12px;
+  }
+
+  .segments button {
+    border: 1px solid rgb(0 0 0 / 18%);
+    border-radius: 999px;
+    background: #fff;
+    color: #000;
+    padding: 4px 9px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .segments button.muted {
+    background: rgb(255 255 255 / 45%);
+    color: rgb(0 0 0 / 42%);
+    text-decoration: line-through;
   }
 
   .chart-host :global(svg),

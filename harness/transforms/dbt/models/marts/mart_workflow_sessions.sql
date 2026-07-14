@@ -1,4 +1,10 @@
-with message_rollup as (
+with sessions as (
+    select
+        *,
+        row_number() over (order by created_at, slug) as session_number
+    from {{ source('app', 'app_sessions') }}
+),
+message_rollup as (
     select
         session_slug,
         count(*) as message_count,
@@ -42,8 +48,8 @@ source_rollup as (
 )
 
 select
-    session.slug as session_slug,
-    session.title,
+    session.session_number,
+    coalesce(nullif(session.title, ''), 'Untitled session') as session_title,
     session.created_at,
     session.updated_at,
     date_diff('second', session.created_at, session.updated_at) as session_duration_seconds,
@@ -68,7 +74,7 @@ select
         when coalesce(event.tool_error_count, 0) > 0 then 'completed_with_tool_errors'
         else 'completed'
     end as workflow_state
-from {{ source('app', 'app_sessions') }} as session
+from sessions as session
 left join message_rollup as message on message.session_slug = session.slug
 left join event_rollup as event on event.session_slug = session.slug
 left join source_rollup as source on source.session_slug = session.slug

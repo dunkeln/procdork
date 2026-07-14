@@ -19,7 +19,8 @@ attached evidence.
 
 # Grain
 
-One row per application session.
+One row per application session, identified by `session_number` and
+`session_title` rather than its storage key.
 
 # Measures
 

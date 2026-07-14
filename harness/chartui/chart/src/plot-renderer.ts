@@ -33,9 +33,11 @@ function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel
     marginRight: 18,
     marginBottom: 48,
     marginLeft: 54,
-    x: { label: chart.dimension },
-    y: { grid: true, label: chart.value },
-    color: chart.series ? { legend: true, range: SERIES_COLORS } : undefined,
+    x: { label: displayLabel(chart.dimension) },
+    y: { grid: true, label: displayLabel(chart.value) },
+    color: chart.series
+      ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS }
+      : undefined,
     style: plotStyle(),
     marks:
       chart.chart_kind === "line"
@@ -104,9 +106,9 @@ function renderCategoricalHeatmap(Plot: PlotModule, target: HTMLElement, chart: 
     marginRight: margins.right,
     marginBottom: margins.bottom,
     marginLeft: margins.left,
-    x: { label: chart.dimension, tickSize: 0 },
-    y: { label: chart.series, tickSize: 0 },
-    color: { legend: true, type: "linear", range: HEAT_COLORS },
+    x: { label: displayLabel(chart.dimension), tickSize: 0 },
+    y: { label: displayLabel(chart.series ?? ""), tickSize: 0 },
+    color: { label: displayLabel(chart.value), legend: true, type: "linear", range: HEAT_COLORS },
     style: plotStyle(),
     marks,
   } satisfies PlotOptions);
@@ -120,9 +122,9 @@ function renderContinuousHeatmap(Plot: PlotModule, target: HTMLElement, chart: C
     marginRight: 18,
     marginBottom: 42,
     marginLeft: 54,
-    x: { label: chart.dimension, grid: true },
-    y: { label: chart.series, grid: true },
-    color: { legend: true, type: "linear", range: HEAT_COLORS },
+    x: { label: displayLabel(chart.dimension), grid: true },
+    y: { label: displayLabel(chart.series ?? ""), grid: true },
+    color: { label: displayLabel(chart.value), legend: true, type: "linear", range: HEAT_COLORS },
     style: plotStyle(),
     marks: [
       Plot.rect(
@@ -201,7 +203,12 @@ function formatCellValue(value: unknown): string {
 }
 
 function tooltip(chart: ChartViewModel): (datum: Record<string, unknown>) => string {
-  return (datum) => chart.columns.map((column) => `${column}: ${String(datum[column] ?? "")}`).join("\n");
+  return (datum) =>
+    chart.columns.map((column) => `${displayLabel(column)}: ${String(datum[column] ?? "")}`).join("\n");
+}
+
+function displayLabel(column: string): string {
+  return column.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function plotStyle() {
@@ -222,7 +229,7 @@ function renderTable(chart: ChartViewModel): HTMLTableElement {
   const thead = table.createTHead();
   const header = thead.insertRow();
   chart.columns.forEach((column) => {
-    header.appendChild(document.createElement("th")).textContent = column;
+    header.appendChild(document.createElement("th")).textContent = displayLabel(column);
   });
 
   const tbody = table.createTBody();

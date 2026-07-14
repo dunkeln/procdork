@@ -45,17 +45,17 @@ playbook. For example:
 
 ```yaml
 interpretations:
-  - "heatmap: compare source_count across session_slug and evidence_type"
+  - "heatmap: compare source_count across session_number and evidence_type"
 ```
 
 Before adding a visualization:
 
 1. Confirm the table emits the required dimensions and numeric measure.
-2. Check `src/harness/charts.py` for an existing chart kind.
+2. Check `src/harness/chart_payload.py` for an existing chart kind.
 3. If supported, add only the table-specific knowledge interpretation.
 4. If unsupported, extend the chart literal, payload validation, renderer, and
    `query` tool schema together.
-5. Render one representative result and inspect the SVG or Markdown output.
+5. Render one representative result through the MCP App or inspect the Markdown output.
 
 Keep query columns ordered according to the renderer contract:
 

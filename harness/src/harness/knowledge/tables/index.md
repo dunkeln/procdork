@@ -22,6 +22,5 @@ than shape. Public mart ids are stable labels, not source-system identifiers.
 * [Refresh Runs](refresh_runs.md) - Source-sync and transform publication outcomes for each scheduled batch.
 * [Supplier Intelligence](supplier_intelligence.md) - Evidence coverage and unresolved claim conflicts by supplier.
 * [Supplier Claims](supplier_claims.md) - Source-backed extracted procurement facts at claim grain.
-* [Supplier Recommendations](supplier_recommendations.md) - Pareto frontier for supplier review.
-* [Supplier Evidence Matrix](supplier_evidence_matrix.md) - Heatmap-ready supplier evidence dimensions.
+* [Supplier Extraction Coverage](supplier_extraction_coverage.md) - Coverage gap between observed documents and structured suppliers.
 * [Claim Coverage](claim_coverage.md) - Evidence coverage and conflict exposure by procurement field.

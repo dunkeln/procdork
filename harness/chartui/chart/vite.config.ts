@@ -19,8 +19,7 @@ export default defineConfig({
     rollupOptions: {
       input,
     },
-    outDir: "dist",
-    emptyOutDir: true,
+    outDir: "../../src/harness/chartui",
+    emptyOutDir: false,
   },
 });
-

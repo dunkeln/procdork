@@ -7,19 +7,19 @@ from urllib.parse import urlsplit
 
 from duckdb import DuckDBPyConnection, StatementType
 from mcp.server.fastmcp import FastMCP
-from mcp.types import CallToolResult, Icon, TextContent, ToolAnnotations
+from mcp.types import Annotations, CallToolResult, Icon, TextContent, ToolAnnotations
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 
-from charts import (
+from .charts import (
     build_chart,
     decode_chart,
     encode_chart,
     render_markdown_table,
     render_svg,
 )
-from connectors.workos import workos_auth
-from olap import connect_duckdb, load_dotenv_once
+from .connectors.workos import workos_auth
+from .olap import connect_duckdb, load_dotenv_once
 
 
 KNOWLEDGE_ROOT = Path(__file__).parent / "knowledge"
@@ -33,8 +33,9 @@ load_dotenv_once()
 mcp = FastMCP(
     "procdork",
     instructions=(
-        "Begin every analytical workflow by reading okf://bundle/index, then follow only the relevant "
-        "knowledge links before deciding whether to use any tools. Do not begin with table discovery or querying. "
+        "Begin every analytical workflow by reading the knowledge index. Use okf://bundle/index when resources "
+        "are available; otherwise call read_knowledge with path='index'. Follow only the relevant knowledge links "
+        "before table discovery or querying. "
         "Analytics tools are read-only. "
         "Query results return a Markdown table or an ephemeral chart plus deterministic key facts. "
         "Answer from key_facts; do not recompute values from charts. Include the returned table or chart when useful."
@@ -71,7 +72,28 @@ for knowledge_path in sorted(KNOWLEDGE_ROOT.rglob("*.md")):
         title=concept_id.replace("/", " / ").replace("_", " ").title(),
         description=f"Git-authored OKF document: {concept_id}",
         mime_type="text/markdown",
+        annotations=Annotations(audience=["assistant"], priority=1.0)
+        if concept_id == "index"
+        else None,
     )(reader(knowledge_path))
+
+
+@mcp.tool(
+    title="Read knowledge first",
+    annotations=READ_ONLY,
+)
+def read_knowledge(path: str = "index") -> str:
+    """Read reviewed knowledge. Call with path='index' before any analytics tool."""
+    root = KNOWLEDGE_ROOT.resolve()
+    requested = path.strip().removesuffix(".md").strip("/") or "index"
+    document = (root / requested).resolve()
+    if document.is_dir():
+        document /= "index.md"
+    else:
+        document = document.with_suffix(".md")
+    if not document.is_relative_to(root) or not document.is_file():
+        raise ValueError(f"Unknown knowledge path: {path}")
+    return document.read_text(encoding="utf-8")
 
 
 @mcp.tool(
@@ -81,9 +103,9 @@ for knowledge_path in sorted(KNOWLEDGE_ROOT.rglob("*.md")):
 def query(
     sql: str,
     title: str = "Analytics result",
-    chart_kind: Literal["auto", "line", "bar", "table"] = "auto",
+    chart_kind: Literal["auto", "line", "bar", "heatmap", "table"] = "auto",
 ) -> CallToolResult:
-    """Run read-only SQL. Select category, segment, value for a segmented bar or line chart."""
+    """After reading relevant knowledge, run read-only SQL. Use category, segment, value for segmented or heatmap charts."""
     columns, rows, truncated = execute_readonly(sql, 25)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
     structured: dict[str, object] = {
@@ -135,7 +157,7 @@ def execute_readonly(
     structured_output=True,
 )
 def list_tables() -> dict[str, object]:
-    """List tables that are ready to query."""
+    """After reading relevant knowledge, list tables that are ready to query."""
     with connect_duckdb() as connection:
         rows = [[public_name] for public_name, *_ in published_tables(connection)]
     return {"columns": ["table_name"], "rows": rows, "truncated": False}
@@ -147,7 +169,7 @@ def list_tables() -> dict[str, object]:
     structured_output=True,
 )
 def describe_table(table_name: str) -> dict[str, object]:
-    """List the columns and types for one table returned by list_tables."""
+    """After reading relevant knowledge, describe one table returned by list_tables."""
     with connect_duckdb() as connection:
         connection.execute("set enable_external_access = false")
         matches = [

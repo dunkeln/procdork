@@ -5,7 +5,7 @@ import json
 from typing import Literal
 
 import duckdb
-from extraction import HarnessModel
+from .extraction import HarnessModel
 from pydantic import Field
 
 

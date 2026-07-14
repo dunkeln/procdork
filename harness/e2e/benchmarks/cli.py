@@ -8,12 +8,12 @@ import click
 
 from e2e.benchmarks.evaluator import DIMENSIONS, human_evaluation, operator_evaluation
 from e2e.benchmarks.runner import load_cases, run_benchmark, write_charts
-from evaluations import (
+from harness.evaluations import (
     EvaluationResult,
     ensure_evaluation_table,
     record_evaluation,
 )
-from olap import connect_duckdb, duckdb_path as resolve_duckdb_path
+from harness.olap import connect_duckdb, duckdb_path as resolve_duckdb_path
 
 
 @click.group()

@@ -1,268 +1,169 @@
-<h1 align="center">procdork - harness</h1>
+<h1 align="center">the harness</h1>
 
-The harness is the backend for procdork's data moat.
+The harness turns source evidence into governed answers for user agents.
 
-It is not just an ETL script. It is where raw evidence lands, repeatable transforms run, and MCP clients receive both live answers and reviewed organizational context.
+The [project README](../README.md) explains the product argument and measured
+evidence. This document explains how to operate and extend the runtime.
 
-## The Simple Story
-
-Traditional ELT usually asks us to build the highway before we know where people actually drive.
-
-```text
-source -> connector -> warehouse -> dbt -> marts -> BI/API/MCP
-```
-
-That can work, but it makes the slowest part happen early. Before we know the useful questions, we are already choosing vendor paths, shaping schemas, writing dbt models, and creating product surfaces.
-
-The harness separates the data plane from the knowledge plane.
+## One Loop
 
 ```text
-data:      source -> raw evidence -> DuckDB/MotherDuck -> dbt marts -> MCP tools
-knowledge: reviewed OKF bundle -------------------------------> MCP resources
+sources
+  -> connectors
+  -> typed raw evidence
+  -> DuckDB or MotherDuck
+  -> dbt tables
+  -> reviewed knowledge
+  -> MCP
+  -> user agents
 ```
 
-We capture the source first, keep the raw bytes, and make the evidence queryable. Engineers can add dbt models when reproducibility or a product contract requires one. Stable definitions, join guidance, caveats, and playbooks are reviewed separately into the Git-authored OKF bundle. Agents can read that context before and while they use live tools.
+Each part has one job.
 
-## Code Boundary
+Connectors translate external systems. Extraction and loading preserve source
+evidence. dbt makes repeated computation explicit. Knowledge records meaning
+and caveats. MCP gives every compatible agent the same read-only boundary.
 
-The harness owns typed evidence, loading rules, transforms, knowledge, and the MCP surface. External systems live under `connectors/` and translate into those contracts.
+The parts remain separate in code but ship as one small Python package.
 
-```text
-connectors -> typed harness stages -> DuckDB/dbt -> MCP
-```
-
-Entrypoints wire connectors into stages with ordinary callables or open connections. Core stages do not select providers. This keeps future schedulers or agent loops free to wrap the same stages without putting orchestration, state, or provider registries into the harness today.
-
-## The Amdahl's Law Bet
-
-Amdahl's Law says speedup is capped by the part of the system that cannot be parallelized.
-
-In normal words: if half the work must happen in one slow line, adding more workers only helps the other half.
-
-Traditional ELT has a big serial section before learning starts:
-
-```text
-pick connector
-model schema
-load warehouse
-write dbt
-build mart
-then learn if anyone needed it
-```
-
-The harness tries to make the serial section smaller:
-
-```text
-capture raw evidence
-load manifest/index
-let people/agents explore
-build shared transforms only when useful
-```
-
-So the point is not "DuckDB is faster than a warehouse." The point is:
-
-```text
-Traditional ELT serializes learning behind pipeline/modeling work.
-Harness lets learning begin over raw evidence before shared modeling is required.
-```
-
-Example hypothesis:
-
-```text
-Traditional ELT:
-serial fraction = 0.60
-4 workers speedup = 1 / (0.60 + 0.40 / 4) = 1.43x
-
-Harness:
-serial fraction = 0.25
-4 workers speedup = 1 / (0.25 + 0.75 / 4) = 2.29x
-```
-
-Those numbers are placeholders until measured. The thing we should measure is not generic query speed. It is time from source arrival to a validated reusable answer.
-
-## The Gustafson's Law Moat
-
-Gustafson's Law looks at scaling from the other direction.
-
-Amdahl's Law asks how fast one fixed job can get when more workers help. Gustafson's Law asks how much larger the useful job can become when more workers show up.
-
-In normal words: if the serial part stays small, more people and agents can take on more real work instead of waiting in one line.
-
-That matters for the harness because the useful workload is not one dashboard. It is many teams asking many questions over many sources:
-
-```text
-BI asks for reporting cuts
-QA asks for failure patterns
-DS asks for feature evidence
-programmers ask for operational traces
-execs ask for compact business answers
-```
-
-The moat is that the harness lets that work expand without forcing every question through a modeling bottleneck first.
-
-```text
-raw evidence stays available
-agents explore in parallel
-server-side compute keeps answers compact
-shared dbt models remove known recomputation
-OKF supplies durable meaning to every client
-```
-
-As the number of teams and agents grows, the goal is not just faster execution. The goal is more validated analytical surface area per scarce review hour.
-
-The useful measure is:
-
-```text
-reusable answers created per human review hour
-```
-
-If that number grows as more agents explore the moat, Gustafson's Law is working in our favor.
-
-## What Stays Raw
-
-Raw evidence belongs in blob storage.
-
-Today that can be local disk. Later it can be S3 or R2. The contract is the same: store the original bytes, content hash, source pointer, adapter name, and load timestamp.
-
-Raw evidence is the source of truth. It should not be rewritten to fit the first idea we had.
-
-## What Gets Queried
-
-DuckDB is the local OLAP surface. MotherDuck can become the shared remote OLAP surface.
-
-This layer is where manifests, loaded source tables, and marts are queryable. It is not the raw evidence store. It is the place where we inspect, count, aggregate, and serve.
-
-Set `DUCKDB_PATH=md:procdork_analytics` and `MOTHERDUCK_TOKEN` to send harness tables to MotherDuck. Without `DUCKDB_PATH`, the harness falls back to `data/harness.duckdb`.
-
-Run `uv run python main.py sync-neon-chat` to copy the demo web app's Neon chat tables into the harness OLAP database as `app_*` tables.
-
-## Evaluation Replay
-
-Evaluation starts from a real historical case, reruns its original request
-against a chosen deployment, evaluates the new response, and records the exact
-request, response, citations, versions, and evidence URL.
-
-```text
-historical case -> live/preview deployment -> evaluator -> raw result -> dbt marts -> MCP
-```
-
-Run both prior successes and failures by default:
+## Start Here
 
 ```bash
-uv run python main.py eval-replay --system-version <release-or-commit>
+cd harness
+uv sync --frozen
+uv run harness --help
 ```
 
-Use `--previous-result fail` while repairing known failures. Use
-`--previous-result pass` before promotion to check that known-good behavior did
-not regress. Replay sessions use an `eval-` prefix, remain auditable in the app,
-and are excluded from future seed-case selection.
-
-dbt publishes the latest case state in `mart_evaluation_cases`, the repair queue
-in `mart_evaluation_failures`, known-good anchors in
-`mart_evaluation_successes`, and pass-to-fail changes in
-`mart_evaluation_regressions`. MCP exposes these internal models as tables
-without adding another runtime surface.
-
-## Defensible Benchmark
-
-The benchmark asks 20 glossary-grounded analytical questions across exact
-retrieval, comparison, freshness, evidence quality, knowledge application, and
-honest abstention. Each automated case runs three times through the normal
-harness and a raw read-only SQL baseline. A separate command times one human
-pass over the same cases. Its code, corpus, baseline server, judge connector,
-and generated evidence are isolated under `e2e/benchmarks/`.
+Run the MCP server locally:
 
 ```bash
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-run \
-  --model <agent-model> --judge-model <anthropic-model> \
-  --dataset-version <data-version> --system-version <release-or-commit> \
-  --pricing-date <yyyy-mm-dd> \
-  --input-usd-per-million <rate> \
-  --cached-input-usd-per-million <rate> \
-  --output-usd-per-million <rate>
-
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-human \
-  --dataset-version <data-version> --system-version <release-or-commit>
-
-# Browser operators record agent-operated timing separately from human timing.
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-record-operator --help
-
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-calibrate \
-  --dataset-version <data-version> --system-version <release-or-commit>
-
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-charts
-
-uv run --group benchmark python -m e2e.benchmarks.cli benchmark-verify \
-  --dataset-version <data-version> --system-version <release-or-commit>
+uv run harness serve-mcp
 ```
 
-Deterministic checks and the pinned Anthropic judge write through the existing
-provider-neutral evaluation contract. Semantic scores are report-only. Dollar
-values are dated token-price proxies, not billing records. dbt publishes run,
-summary, comparison, and calibration tables through the existing MCP surface.
+The local endpoint is `http://localhost:8000/mcp`. The deployed endpoint is
+`https://procdork.vercel.app/mcp`.
 
-## What Gets Built
+Without configuration, analytical data lives in `data/harness.duckdb`. Point
+`DUCKDB_PATH` at another DuckDB-compatible location to change the OLAP backend.
 
-Read-only SQL is for discovery.
+## What Agents Receive
 
-The harness does not rank queries or infer what deserves permanence. Notebook and ad hoc SQL can remain exploratory. An engineer writes a dbt model when a result needs to be reproducible, shared, tested, or served through a stable product contract.
+The MCP exposes four tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `read_knowledge` | Read reviewed meaning and caveats before analysis |
+| `list_tables` | Discover published analytical tables |
+| `describe_table` | Inspect a table's columns and types |
+| `query` | Run one bounded, read-only analytical statement |
+
+Knowledge documents are also exposed as MCP resources under
+`okf://bundle/...`.
+
+`query` returns a Markdown table when the result is not safely chartable.
+Otherwise it can render line, bar, segmented, or heatmap SVGs and return
+deterministic key facts. SQL performs the computation; the agent does not need
+to recalculate the result in chat.
+
+The server accepts one `SELECT`, `DESCRIBE`, `SHOW`, or `EXPLAIN` statement,
+disables external access during execution, and bounds returned rows. This is an
+application-enforced read-only boundary; database credentials still need the
+appropriate operating controls.
+
+## Operator Surfaces
+
+An operator normally works in four places:
+
+| Surface | Location | Responsibility |
+| --- | --- | --- |
+| Connectors | `src/harness/connectors/` | Translate external systems into harness contracts |
+| Transforms | `transforms/dbt/` | Publish repeatable analytical tables |
+| Knowledge | `src/harness/knowledge/` | Record reviewed meaning, caveats, and interpretations |
+| Evaluators | `src/harness/evaluators/` | Score source-backed outcomes with ordinary functions |
+
+The stable runtime lives in `src/harness/`. Benchmarks and smoke evidence stay
+under `e2e/`; they are not application features.
+
+### Add a source
+
+Keep provider behavior in a connector. Feed its output into the existing typed
+extraction or loading boundary instead of teaching the core about a vendor.
+
+```bash
+uv run harness extract <url-or-path>
+uv run harness sync-neon-chat
+uv run harness sync-ingestion-events <events.jsonl>
+```
+
+### Publish an analysis
+
+Exploration may remain in notebooks or transient SQL. When an answer must be
+repeatable, add a dbt model. Its adjacent knowledge document should explain the
+table's grain, measures, caveats, and useful presentation shapes.
 
 ```text
-exploration -> explicit engineering decision -> dbt model or MCP tool
+dbt determines the answer
+knowledge explains the answer
+MCP delivers the answer
 ```
 
-Knowledge remains independent:
+The runtime never writes knowledge. A person edits it, reviewers approve it,
+and deployment serves it read-only.
+
+### Evaluate a release
+
+Evaluators share one provider-neutral result contract. Provider SDK details
+belong in connectors; evaluator logic remains an ordinary operator-editable
+function.
+
+```bash
+uv run harness eval-replay --system-version <release-or-commit>
+```
+
+The larger comparison corpus and its raw-SQL baseline are isolated under
+`e2e/benchmarks/`. They produce evidence for the analytical tables; they do not
+expand the production MCP surface.
+
+## Refresh And Publication
+
+The harness does not contain a scheduler. An external trigger runs the existing
+commands:
 
 ```text
-stable understanding -> reviewed OKF concept -> MCP resource
+sync sources -> dbt build -> record refresh outcome
 ```
 
-One path may reference the other, but neither waits for the other. This avoids speculative machinery while keeping both computation and meaning reviewable.
+The repository's GitHub Actions workflow runs that chain every 15 minutes and
+preserves a refresh receipt. A failed source or transform is reported as
+degraded or failed while previously published tables remain available.
 
-## MCP Shape
+This stays one scheduled workflow until retries, backfills, or dependencies
+prove that a workflow engine is necessary.
 
-The harness serves an agent-agnostic MCP endpoint named `procdork` over HTTP.
+## Configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `DUCKDB_PATH` | Local DuckDB path or remote MotherDuck database |
+| `MOTHERDUCK_TOKEN` | Server-side MotherDuck credential |
+| `DATABASE_URL` | Source Postgres connection used by the Neon connector |
+| `WORKOS_AUTHKIT_DOMAIN` | WorkOS issuer for OAuth-protected MCP |
+| `MCP_RESOURCE_URL` | Public MCP resource URL used by OAuth and chart links |
+| `CHART_SIGNING_KEY` | Encrypts short-lived stateless chart payloads |
+| `MCP_MAX_QUERY_ROWS` | Maximum rows fetched by read-only execution |
+| `HOST`, `PORT` | MCP HTTP bind address |
+
+Set `WORKOS_AUTHKIT_DOMAIN` and `MCP_RESOURCE_URL` together for OAuth. Leave
+both unset for local development.
+
+## Change Safely
+
+A small feature can cross several contracts:
 
 ```text
-resources: reviewed OKF context
-tools:     table discovery, table description, and bounded read-only SQL
+dbt shape -> knowledge interpretation -> MCP schema -> renderer -> runtime proof
 ```
 
-The MCP vocabulary stays role-neutral: tables, queries, results, charts, and
-knowledge. Internal dbt model names are exposed as plain table names so clients
-do not need pipeline-engineering language to ask analytical questions.
-
-The server uses DuckDB's parser to accept one `SELECT`, `DESCRIBE`, `SHOW`, or `EXPLAIN` statement, disables external access, and caps returned rows. Any MCP client can connect to the same `/mcp` endpoint without repository-specific client configuration.
-
-This is an application-enforced boundary, not a database permission boundary: the current `MOTHERDUCK_TOKEN` remains write-capable. Keep the endpoint private and the token server-side. Add database-enforced read-only credentials when the operating risk or plan justifies them.
-
-Set `WORKOS_AUTHKIT_DOMAIN` and `MCP_RESOURCE_URL` together to require WorkOS OAuth. Leave both unset for local development. The WorkOS dashboard must list the MCP URL as a Resource Indicator and enable CIMD or DCR for client registration.
-
-## OKF Shape
-
-OKF is not the database, telemetry, transform engine, or runtime-owned state. It is a versioned knowledge bundle written in Markdown and reviewed in Git.
-
-```text
-DuckDB/MotherDuck hold current evidence.
-dbt models hold repeatable computation.
-OKF holds durable meaning.
-MCP serves resources and tools without owning either source of truth.
-```
-
-That means no one-off SQL, raw captures, volatile values, or per-run diary in OKF. A data engineer can steward the bundle, but the relevant domain owner reviews business, QA, compliance, or operational claims.
-
-Production serves the bundle read-only. New knowledge is drafted, reviewed, merged, and deployed; runtime never writes it.
-
-## The Leverage
-
-The moat is not one vendor or one clever model, it's the loop:
-
-```text
-preserve raw evidence
-explore without pre-modeling every question
-author shared transforms only where useful
-review durable knowledge in Git
-serve stable MCP resources and tools
-```
-
-Small first. Measured later. Add machinery only when operating evidence earns it.
+Use [CONTRIBUTING.md](CONTRIBUTING.md) to identify the affected seams and run
+only the checks reached by the change. Do not add registries, orchestration, or
+parallel schemas before repeated operating evidence requires them.

@@ -3,10 +3,12 @@
 
 *It's a dork. "Dorks" or "Google Dorks" refer to advanced search strings used in search engines (like Google) to uncover specific, often unintended information.*
 
-This dork is a harness built to run at the neck break speed of AI, but intended for supply chain workflows. ELT pipelines are ded, cuz data analysts are dead.
-Coding agents are as much part of infrastructure as the infrastructure.
+Procdork is a harness for ELT operations. It preserves source evidence,
+makes repeatable analysis explicit, and gives coding agents the same governed
+data that operators use.
 
-## Measured Evidence
+<details>
+<summary><strong>Measured Evidence</strong></summary>
 
 ### Repeated Answers
 
@@ -35,7 +37,7 @@ whether an agent can find and read the knowledge files.
 ### Adversarial Data Readiness
 
 A second test adversarially challenged the harness. From July 12, 2026 at 5:26
-PM to 6:40 PM Pacific time, an operator asked about supplier choices, evidence
+PM to 6:40 PM Pacific time, a simulated operator asked about supplier choices, evidence
 gaps, freshness, ingestion health, confidence, conflicts, and delivery
 performance. Some transforms were deliberately left stale or without the data
 needed to answer.
@@ -48,10 +50,10 @@ and could not prove. A review of the saved answers found no invented supplier
 ranking, delivery score, confidence measure, or conflict result.
 
 The workflows used 6.31 million cumulative input tokens. Of those, 5.69 million
-were cached, for a 90.1% cache rate. They used 625,365 fresh input tokens and
-44,695 output tokens. The median completed workflow used 25,523 fresh input
-tokens, 1,305 output tokens, and a 27,100-token billable proxy. The 95th
-percentile billable proxy was 43,995 tokens. Here, billable proxy means fresh
+were cached, for a 90.1% cache rate. They used 625K fresh input tokens and
+44K output tokens. The median completed workflow used 25.5K fresh input
+tokens, 1.3K output tokens, and a 27K-token billable proxy. The 95th
+percentile billable proxy was 44K tokens. Here, billable proxy means fresh
 input plus output; it is not a dollar invoice.
 
 The harness stayed inside its deterministic evidence boundaries. That kept the
@@ -63,6 +65,8 @@ development hours, so they do not yet support organizational-time-saved or
 total-development-time claims.
 
 ![Token economics under adversarial data readiness](assets/adversarial-token-economics.svg)
+
+</details>
 
 ## The Harness
 
@@ -93,7 +97,8 @@ A Semantic View remains a Snowflake object. A Metric View and Genie Agent
 configuration remain Databricks objects. In the harness, transformations are
 SQL and dbt, institutional knowledge is Markdown, and delivery uses MCP. These
 artifacts remain readable if the storage engine, model, host, or analytical
-client changes. The advantage is reversibility: changing infrastructure does
+client changes.   
+The advantage is **reversibility**: changing infrastructure does
 not require throwing away the organization's explanations with it.
 
 ### 2. Changes happen in one reviewable place
@@ -146,15 +151,60 @@ replaceable artifacts. It does not yet prove lower platform cost, faster
 delivery, stronger governance, or greater scale.
 
 One kind of reuse has been measured. Across 24 completed adversarial workflows,
-90.1% of cumulative input tokens came from cache. That does not mean the tokens
-disappeared or were free. It means only 9.9% of cumulative input was fresh.
+90.1% of cumulative input tokens came from cache. Only 9.9% of cumulative input was fresh.
 
 ![Observed context reuse across completed workflows](assets/context-reuse.svg)
 
-## References
+<details>
+<summary><strong>Public Cost Study</strong></summary>
+
+Public pricing pages suggest the harness has a much lower operating floor than
+a managed warehouse plus transformation plus AI-BI stack for this workload.
+This is a study from published prices, not an invoice or vendor benchmark.
+
+An AWS deployment with one small public MCP service, one scheduled refresh task,
+EventBridge Scheduler, S3, ECR, CloudWatch logs, and an application load
+balancer is plausibly a tens-to-low-hundreds monthly system. The scheduler line
+item is effectively zero at this scale because EventBridge Scheduler includes
+14 million monthly invocations in the free tier. The fixed AWS tax is more
+likely to be the public load balancer than the scheduled harness job.
+
+| Operating shape | Plausible monthly floor |
+|---|---:|
+| Harness on AWS Fargate, public MCP, scheduler, light logs/storage | `$60-$180` |
+| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, plus three dbt Cloud developer seats | `$1,000-$1,800+` |
+| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, plus three dbt Cloud developer seats | `$1,700-$3,200+` |
+
+The Snowflake estimate uses public Enterprise pricing around `$3` per credit,
+Gen1 warehouse rates of 1 credit/hour for X-Small, 2 credits/hour for Small,
+and 4 credits/hour for Medium, plus dbt Cloud Starter pricing of `$100` per
+developer seat per month. Cortex, Snowflake Intelligence, Genie, Databricks SQL
+warehouse usage, storage, egress, support, and enterprise discounts are not
+included in those rows.
+
+The important cost claim is not that the harness removes AI spend. It redirects
+it. Managed warehouse AI features can charge inside the data platform while the
+user still spends tokens again in a chat or coding agent. The harness keeps the
+pipeline and chart-serving path deterministic, so the recurring platform cost is
+mostly container runtime and storage, while reasoning spend stays at the
+user-facing agent layer where the user already intended to spend it.
+
+</details>
+
+<details>
+<summary><strong>References</strong></summary>
+
+### AWS
+
+* [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing/) - per-second container compute pricing for requested vCPU, memory, and storage.
+* [Amazon EventBridge pricing](https://aws.amazon.com/eventbridge/pricing/) - Scheduler free tier and per-invocation pricing.
+* [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) - public load balancer hourly and capacity-unit pricing.
 
 ### Snowflake
 
+* [Snowflake pricing](https://www.snowflake.com/en/pricing-options/) - public credit and storage pricing by edition and region.
+* [Snowflake warehouses](https://docs.snowflake.com/en/user-guide/warehouses-overview) - warehouse credit consumption by size.
+* [Snowflake AI pricing](https://docs.snowflake.com/en/user-guide/snowflake-cortex/pricing) - AI Credits, Cortex token/message billing, and warehouse-cost separation.
 * [Dynamic Tables](https://docs.snowflake.com/en/user-guide/dynamic-tables/overview) - declarative, dependency-aware transformation pipelines with managed refresh.
 * [Tasks](https://docs.snowflake.com/en/user-guide/tasks-intro) - scheduled and event-triggered workflow execution.
 * [Semantic Views](https://docs.snowflake.com/en/user-guide/views-semantic/overview) - database objects for business entities, relationships, dimensions, facts, and metrics.
@@ -162,13 +212,20 @@ disappeared or were free. It means only 9.9% of cumulative input was fresh.
 
 ### Databricks
 
+* [Databricks pricing](https://www.databricks.com/product/pricing) - public pay-as-you-go pricing model description.
 * [Declarative Pipelines](https://docs.databricks.com/aws/en/ldp/) - batch and streaming ingestion and transformation in SQL and Python.
 * [Lakeflow Jobs](https://docs.databricks.com/aws/en/jobs/) - scheduling, orchestration, control flow, monitoring, and task execution.
 * [Metric Views](https://docs.databricks.com/aws/en/business-semantics/metric-views/) - centrally maintained measures, dimensions, joins, and business definitions in Unity Catalog.
 * [Genie Agent concepts](https://docs.databricks.com/aws/en/genie/concepts) - curated datasets, knowledge, instructions, trusted SQL, benchmarks, and natural-language analytical delivery. Genie Agents were formerly called Genie Spaces.
 * [Genie Agent curation](https://docs.databricks.com/aws/en/genie/best-practices) - Databricks guidance on focused datasets, structured semantics, example SQL, and incremental refinement.
 
+### dbt
+
+* [dbt billing](https://docs.getdbt.com/docs/platform/billing) - seat pricing, successful model billing, Semantic Layer queried metrics, and dbt State usage.
+
 ### Open Knowledge Format
 
 * [OKF specification](https://okf.md/spec/) - the minimal Markdown and YAML convention used for portable organizational knowledge.
 * [OKF FAQ](https://okf.md/faq/) - scope, portability, Git workflow, MCP use, and the explicit distinction between OKF and a data catalog.
+
+</details>

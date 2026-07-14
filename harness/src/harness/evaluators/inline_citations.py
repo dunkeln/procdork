@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from uuid import uuid4
 
-from evaluations import EvaluationResult
+from ..evaluations import EvaluationResult
 
 
 NAME = "inline_citations"

@@ -7,7 +7,7 @@ import json
 from statistics import fmean
 from uuid import uuid4
 
-from evaluations import EvaluationResult
+from harness.evaluations import EvaluationResult
 
 
 DETERMINISTIC_NAME = "benchmark_deterministic"

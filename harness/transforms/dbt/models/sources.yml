@@ -10,6 +10,8 @@ sources:
         description: Provider-neutral results written by scheduled evaluator jobs.
       - name: raw_ingestion_events
         description: Append-only completion events emitted by the document-ingestion service.
+      - name: raw_refresh_runs
+        description: Scheduler receipts for source sync and dbt publication outcomes.
   - name: app
     schema: main
     tables:

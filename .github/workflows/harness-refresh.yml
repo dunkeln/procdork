@@ -1,0 +1,101 @@
+name: Refresh harness analytics
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-analytics-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: harness
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DUCKDB_PATH: md:procdork_analytics
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      REFRESH_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install uv
+      - run: uv sync --frozen
+      - name: Configure dbt
+        run: |
+          mkdir -p "$RUNNER_TEMP/dbt-profiles"
+          cp transforms/dbt/profiles.yml.example "$RUNNER_TEMP/dbt-profiles/profiles.yml"
+      - name: Start refresh receipt
+        run: |
+          uv run harness record-refresh \
+            --run-id "$REFRESH_RUN_ID" \
+            --status running \
+            --revision "$GITHUB_SHA" \
+            --source-results '{}' \
+            --transform-status pending
+      - id: sync_neon
+        name: Sync Neon chat
+        continue-on-error: true
+        run: uv run harness sync-neon-chat
+      - id: dbt
+        name: Build independent dbt models
+        continue-on-error: true
+        run: |
+          uv run dbt build \
+            --project-dir transforms/dbt \
+            --profiles-dir "$RUNNER_TEMP/dbt-profiles" \
+            --target motherduck
+      - id: classify
+        name: Record refresh outcome
+        env:
+          SOURCE_OUTCOME: ${{ steps.sync_neon.outcome }}
+          TRANSFORM_OUTCOME: ${{ steps.dbt.outcome }}
+        run: |
+          if [[ "$SOURCE_OUTCOME" == success && "$TRANSFORM_OUTCOME" == success ]]; then
+            status=healthy
+          elif [[ "$SOURCE_OUTCOME" == failure && "$TRANSFORM_OUTCOME" == failure ]]; then
+            status=failed
+          else
+            status=degraded
+          fi
+
+          uv run harness record-refresh \
+            --run-id "$REFRESH_RUN_ID" \
+            --status "$status" \
+            --revision "$GITHUB_SHA" \
+            --source-results "{\"neon_chat\":\"$SOURCE_OUTCOME\"}" \
+            --transform-status "$TRANSFORM_OUTCOME" \
+            > "$RUNNER_TEMP/refresh-receipt.json"
+
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Harness refresh: $status"
+            echo
+            echo "| Stage | Outcome |"
+            echo "| --- | --- |"
+            echo "| Neon chat | $SOURCE_OUTCOME |"
+            echo "| dbt build | $TRANSFORM_OUTCOME |"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve refresh evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-refresh-${{ env.REFRESH_RUN_ID }}
+          path: |
+            ${{ runner.temp }}/refresh-receipt.json
+            harness/transforms/dbt/target/run_results.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Report degraded refresh
+        if: steps.classify.outputs.status != 'healthy'
+        run: exit 1

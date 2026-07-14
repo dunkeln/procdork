@@ -1,6 +1,7 @@
 # The dork evals harness
 
 Read [AGENTS.md](../AGENTS.md) to learn yourself.
+For harness changes, follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### What's our push?
 

@@ -4,7 +4,7 @@ from duckdb import StatementType
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from olap import connect_duckdb
+from harness.olap import connect_duckdb
 
 
 mcp = FastMCP("raw-analytics")

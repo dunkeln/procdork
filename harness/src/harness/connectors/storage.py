@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from load import LoadedArtifact
+from ..load import LoadedArtifact
 
 
 def write_local_blob(key: str, payload: bytes, storage_root: Path | str) -> str:

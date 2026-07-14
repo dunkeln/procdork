@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from functools import partial
 import json
 import os
@@ -7,26 +8,26 @@ from pathlib import Path
 
 import click
 
-from connectors.neon import sync_neon_chat
-from connectors.ingestion import sync_ingestion_events
-from connectors.procdork import chat_dataset_version, load_chat_cases, replay_chat
-from connectors.sources import read_url_or_file
-from connectors.storage import append_jsonl, write_local_blob
-from evaluations import (
+from .connectors.neon import sync_neon_chat
+from .connectors.ingestion import sync_ingestion_events
+from .connectors.procdork import chat_dataset_version, load_chat_cases, replay_chat
+from .connectors.sources import read_url_or_file
+from .connectors.storage import append_jsonl, write_local_blob
+from .evaluations import (
     ensure_evaluation_table,
     latest_result,
     record_evaluation,
 )
-from evaluators.inline_citations import NAME as EVALUATOR_NAME
-from evaluators.inline_citations import evaluate
-from extraction import extract_source
-from load import load_manifest_duckdb, load_raw
-from olap import connect_duckdb, load_dotenv_once
+from .evaluators.inline_citations import NAME as EVALUATOR_NAME
+from .evaluators.inline_citations import evaluate
+from .extraction import extract_source
+from .load import load_manifest_duckdb, load_raw
+from .olap import connect_duckdb, load_dotenv_once
 
 
 @click.group()
 def main() -> None:
-    """Run the procdork harness."""
+    """Run the analytics harness."""
 
 
 @main.command()
@@ -97,6 +98,91 @@ def sync_ingestion_events_command(event_jsonl: Path, duckdb_path: str | None) ->
     except (OSError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(result.model_dump_json(indent=2))
+
+
+@main.command("record-refresh")
+@click.option("--run-id", required=True)
+@click.option(
+    "--status",
+    required=True,
+    type=click.Choice(["running", "healthy", "degraded", "failed"]),
+)
+@click.option("--revision", required=True)
+@click.option("--source-results", default="{}", show_default=True)
+@click.option(
+    "--transform-status",
+    required=True,
+    type=click.Choice(["pending", "success", "failure", "skipped"]),
+)
+@click.option("--duckdb-path", default=None, help="DuckDB/MotherDuck path.")
+def record_refresh_command(
+    run_id: str,
+    status: str,
+    revision: str,
+    source_results: str,
+    transform_status: str,
+    duckdb_path: str | None,
+) -> None:
+    """Record one scheduler run without discarding successful partial work."""
+    try:
+        sources = json.loads(source_results)
+        allowed = {"success", "failure", "skipped", "cancelled"}
+        if not isinstance(sources, dict) or any(
+            not isinstance(name, str) or result not in allowed
+            for name, result in sources.items()
+        ):
+            raise ValueError("source results must map source names to valid outcomes")
+        now = datetime.now(UTC)
+        completed_at = None if status == "running" else now
+        with connect_duckdb(duckdb_path) as connection:
+            connection.execute(
+                """
+                create table if not exists raw_refresh_runs (
+                    run_id varchar primary key,
+                    started_at timestamptz,
+                    completed_at timestamptz,
+                    status varchar,
+                    revision varchar,
+                    source_results json,
+                    transform_status varchar
+                )
+                """
+            )
+            connection.execute(
+                """
+                insert into raw_refresh_runs values (?, ?, ?, ?, ?, ?::json, ?)
+                on conflict (run_id) do update set
+                    completed_at = excluded.completed_at,
+                    status = excluded.status,
+                    revision = excluded.revision,
+                    source_results = excluded.source_results,
+                    transform_status = excluded.transform_status
+                """,
+                [
+                    run_id,
+                    now,
+                    completed_at,
+                    status,
+                    revision,
+                    json.dumps(sources, sort_keys=True),
+                    transform_status,
+                ],
+            )
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        json.dumps(
+            {
+                "run_id": run_id,
+                "status": status,
+                "revision": revision,
+                "source_results": sources,
+                "transform_status": transform_status,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 @main.command("eval-replay")
@@ -188,11 +274,10 @@ def eval_replay(
     )
 
 
-
 @main.command("serve-mcp")
 def serve_mcp_command() -> None:
-    """Serve procdork's read-only analytics and OKF MCP surface."""
-    from mcp_server import serve
+    """Serve the read-only analytics and knowledge MCP surface."""
+    from .mcp_server import serve
 
     serve()
 

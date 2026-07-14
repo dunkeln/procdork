@@ -19,7 +19,7 @@ Set `INGESTION_EVENT_JSONL` on the ingestion service to append one event after
 each job. An external runner loads the stream with:
 
 ```sh
-uv run python main.py sync-ingestion-events --event-jsonl /shared/ingestion-events.jsonl
+uv run harness sync-ingestion-events --event-jsonl /shared/ingestion-events.jsonl
 ```
 
 The loader is idempotent by `event_id`; rerunning the same file does not create

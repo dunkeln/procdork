@@ -8,8 +8,8 @@ from pathlib import Path, PurePosixPath
 from typing import Callable
 from urllib.parse import urlparse
 
-from extraction import ExtractedSource, HarnessModel, SourcePointer
-from olap import connect_duckdb
+from .extraction import ExtractedSource, HarnessModel, SourcePointer
+from .olap import connect_duckdb
 
 
 class LoadedArtifact(HarnessModel):

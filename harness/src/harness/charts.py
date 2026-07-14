@@ -16,22 +16,24 @@ from lets_plot import (
     geom_bar,
     geom_line,
     geom_point,
+    geom_tile,
     ggplot,
     labs,
     scale_color_manual,
     scale_fill_manual,
+    scale_fill_gradient,
     theme,
 )
 from pydantic import BaseModel
 
 
-ChartKind = Literal["auto", "line", "bar", "table"]
+ChartKind = Literal["auto", "line", "bar", "heatmap", "table"]
 CHART_TTL_SECONDS = 15 * 60
 
 
 class ChartPayload(BaseModel):
     title: str
-    chart_kind: Literal["line", "bar", "table"]
+    chart_kind: Literal["line", "bar", "heatmap", "table"]
     columns: list[str]
     rows: list[list[str | int | float | bool | None]]
     key_facts: list[str]
@@ -57,6 +59,10 @@ def build_chart(
         value_index = numeric_column(rows)
         if value_index is None or len(columns) < 2:
             raise ValueError(f"{kind} charts require a dimension and a numeric measure")
+        if kind == "heatmap" and (len(columns) != 3 or value_index != 2):
+            raise ValueError(
+                "heatmap charts require category, segment, and numeric value columns"
+            )
         segmented = len(columns) == 3 and value_index == 2
         selected_columns = columns if segmented else [columns[0], columns[value_index]]
         selected_rows = (
@@ -80,7 +86,7 @@ def build_chart(
 
 def choose_chart_kind(
     columns: list[str], rows: list[tuple[object, ...]], requested: ChartKind
-) -> Literal["line", "bar", "table"]:
+) -> Literal["line", "bar", "heatmap", "table"]:
     if requested != "auto":
         return requested
     if len(columns) < 2 or numeric_column(rows) is None:
@@ -189,6 +195,16 @@ def render_svg(payload: ChartPayload) -> str:
         if segmented
         else [payload.columns[1]] * len(payload.rows),
     }
+    if payload.chart_kind == "heatmap":
+        plot = ggplot(data, aes("label", "series", fill="value")) + geom_tile()
+        plot += scale_fill_gradient(low="#b8b8ff", high="#ce4257") + labs(
+            title=payload.title,
+            x=payload.columns[0],
+            y=payload.columns[1],
+            fill=payload.columns[2],
+        )
+        return themed(plot).to_svg(w=960, h=540, unit="px")
+
     colors = segment_palette(len(set(data["series"])))
     plot = ggplot(data, aes("label", "value", group="series"))
     if payload.chart_kind == "line":
@@ -213,14 +229,18 @@ def render_svg(payload: ChartPayload) -> str:
         y=payload.columns[-1],
         color=payload.columns[1],
         fill=payload.columns[1],
-    ) + theme(
+    )
+    return themed(plot).to_svg(w=960, h=540, unit="px")
+
+
+def themed(plot):
+    return plot + theme(
         axis_text_x=element_text(angle=30, hjust=1),
         legend_position="bottom",
         panel_background=element_rect(fill="#ffffff"),
         plot_background=element_rect(fill="#ffffff"),
         plot_title=element_text(size=20, face="bold"),
     )
-    return plot.to_svg(w=960, h=540, unit="px")
 
 
 def segment_palette(count: int) -> list[str]:

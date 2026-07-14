@@ -11,11 +11,11 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from charts import build_chart, render_svg
-from e2e.benchmarks.anthropic import JUDGE_PROMPT_VERSION, judge_response
+from harness.charts import build_chart, render_svg
+from e2e.benchmarks.connectors.anthropic import JUDGE_PROMPT_VERSION, judge_response
 from e2e.benchmarks.evaluator import deterministic_evaluation, semantic_evaluation
-from evaluations import record_evaluation
-from olap import connect_duckdb
+from harness.evaluations import record_evaluation
+from harness.olap import connect_duckdb
 
 
 class BenchmarkCase(BaseModel):

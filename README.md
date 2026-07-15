@@ -3,12 +3,159 @@
 
 *It's a dork. "Dorks" or "Google Dorks" refer to advanced search strings used in search engines (like Google) to uncover specific, often unintended information.*
 
-Procdork is a harness for ELT operations. It preserves source evidence,
-makes repeatable analysis explicit, and gives coding agents the same governed
-data that operators use.
+Procdork is materializing a harness for ELT operations. It preserves source evidence, makes repeatable analysis explicit, and gives coding agents the same governed data that operators use. It focuses on a narrow question, **how many governed analytical functions can one small, reviewed operator surface carry?**
+
+An operator usually maintains separate surfaces for source extraction, transforms, semantic context, agent infrastructure, analytics, provenance, and replay. The harness compresses that work into one reviewed harness surface.
+
+For this slice, that is **7 governed functions / 1 reviewed surface**, or
+about **7x operator surface power**. That is not a measured staffing or
+wall-clock reduction.
+
+
+## The Harness
+
+Modern Snowflake and Databricks already combine ingestion, transformation,
+scheduling, governed meaning, and natural-language analytics. The harness does
+not claim to invent that process. It asks whether the same jobs can live
+in a unified control surface.
+
+| Concern | Snowflake | Databricks | The harness |
+|---|---|---|---|
+| Executable business logic | Semantic Views | Metric Views | dbt marts |
+| Institutional context | Semantic metadata and instructions | Genie knowledge store and instructions | Versioned OKF knowledge |
+| Analytical delivery | Cortex Analyst | Genie Agent | MCP exposed for user agents |
+| Query execution | Snowflake warehouse | Databricks SQL warehouse | Replaceable OLAP adapter |
+| Client surface | Platform API and applications | Platform API and applications | Any MCP-capable agent |
+
+This mapping matters in the sense of propellign what exists and is durable. [OKF](#references) does not replace Semantic Views or Metric Views.  
+Those platform objects define executable calculations, dimensions, joins, and
+aggregations. dbt owns that responsibility in the harness. OKF records the
+meaning, caveats, provenance, terminology, and interpretation that should travel
+with those calculations. MCP then exposes the reviewed data and its knowledge
+to user agents.
+
+### 1. The knowledge survives the platform
+
+A Semantic View remains a Snowflake object. A Metric View and Genie Agent
+configuration remain Databricks objects. In the harness, transformations are
+SQL and dbt, institutional knowledge is Markdown, and delivery uses MCP. These
+artifacts remain readable if the storage engine, model, host, or analytical
+client changes.
+The advantage is **reversibility**: changing infrastructure keeps explanations
+portable across infrastructure choices.
+
+### 2. Changes happen in one reviewable place
+
+The transform, its interpretation, its caveats, and its serving behavior live
+in one repository. A team can review them through ordinary diffs instead of
+coordinating changes across warehouse objects, catalog configuration, agent
+instructions, dashboards, and separate administration surfaces. The harness is
+lean because it keeps this slice's control plane small, not because enterprise
+controls are useless.
+
+### 3. Meaning and execution stay separate
+
+dbt determines the answer. OKF explains the answer. MCP delivers the answer.
+This separation prevents prose from silently becoming calculation logic while
+allowing institutional context to evolve without rebuilding the warehouse.
+Executable truth remains testable SQL; human context remains readable text.
+
+### 4. User agents keep one stable boundary
+
+User agents connect through MCP. They do not need to know whether a query runs
+in DuckDB, MotherDuck, or another analytical engine. Storage and compute can
+change behind that boundary without asking every user to adopt another client
+or platform-specific agent. The harness owns the changing backend; the user
+agent keeps the same analytical surface.
+
+### 5. Structure is earned incrementally
+
+The harness can begin with one reviewed transform and one adjacent knowledge
+file. More structure is added when a real analytical need appears, not because
+a platform exposes another object type. This keeps early decisions cheap to
+reverse and lets repeated use determine what deserves to become durable.
+
+That reviewed work is reusable. If one unchanged release serves one workflow,
+it carries one operator touch per workflow. If it serves ten workflows, the
+same touch is spread across ten uses: 0.1 per workflow. At one hundred uses it
+is 0.01, and at one thousand it is 0.001. This is not measured human time. It
+is the simple `1 / N` effect of reusing one reviewed release.
+
+![Operator judgment amortized across workflows](assets/operator-amortization.svg)
+
+Operator judgment does not disappear. A change to data, transforms, knowledge,
+or evaluations starts another review cycle. Between those changes, the same
+reviewed surface can serve more workflows without repeating that decision for
+every user.
+
+That is the scale theory: the harness scales when the reviewed operator surface
+stays stable while workflows, agents, and analytical questions increase. The
+claim is not that infrastructure limits disappear. It is that the operator
+boundary does not have to grow linearly with usage.
+
+```text
+marginal_operator_burden =
+  new_reviewed_surface_changes / new_workflows_served
+```
+
+In the measured adversarial run, one reviewed harness surface served 24
+completed workflows, or **4.17% of one reviewed surface touch per workflow**
+for that release.
+
+Data Warehouse vendors provide the complete loop as integrated platforms. The harness expresses the same loop through open, replaceable artifacts. It does not yet prove lower platform cost, faster delivery, stronger governance, or greater scale.
+
+One kind of reuse has been measured. Across 24 completed adversarial workflows,
+90.1% of cumulative input tokens came from cache. Only 9.9% of cumulative input was fresh.
+
+![Observed context reuse across completed workflows](assets/context-reuse.svg)
+
+<details>
+<summary><strong>Public Cost Study</strong></summary>
+
+Public pricing pages suggest the harness has a lower operating floor than a
+managed warehouse plus platform-native AI-BI stack for this workload. This is a
+study from published prices and is not an invoice or vendor benchmark.
+
+The harness shape here is AWS runtime plus MotherDuck OLAP plus dbt Core. dbt
+Core is open-source transform code in the repository; dbt Cloud seats and
+managed dbt billing are not part of this harness estimate.
+
+An AWS deployment with one small public MCP service, one scheduled refresh
+task, EventBridge Scheduler, S3, ECR, CloudWatch logs, and an application load
+balancer is plausibly a tens-to-low-hundreds monthly system before the OLAP
+platform. The scheduler line item is effectively zero at this scale because
+EventBridge Scheduler includes 14 million monthly invocations in the free tier.
+The fixed AWS tax is more likely to be the public load balancer than the
+scheduled harness job.
+
+| Operating shape | Plausible monthly floor |
+|---|---:|
+| Harness on AWS Fargate plus MotherDuck Lite, if the workload fits included storage and Pulse compute | `$60-$180` |
+| Harness on AWS Fargate plus MotherDuck Business, before heavy compute usage | `$310-$500+` |
+| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, **using dbt Core outside Snowflake** | `$400-$1,500+` |
+| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, using dbt Core outside Snowflake | `$1,400-$2,900+` |
+
+The Snowflake estimate uses public Enterprise pricing around `$3` per credit,
+Gen1 warehouse rates of 1 credit/hour for X-Small, 2 credits/hour for Small,
+and 4 credits/hour for Medium. The MotherDuck Business estimate starts with the
+public `$250` per organization monthly platform price, then adds the AWS runtime
+floor. MotherDuck usage, storage, read scaling, AI units, Snowflake Cortex,
+Snowflake Intelligence, Databricks SQL warehouse usage, storage, egress,
+support, and enterprise discounts are not included in those rows.
+
+The important cost use is not that the harness removes AI spend. It redirects
+it. In managed platforms, AI usage is metered inside the platform while the user
+still spends tokens again in a chat or coding agent. The harness keeps the
+pipeline and chart-serving path deterministic, so the recurring platform cost is
+mostly container runtime and storage, while reasoning spend stays at the
+user-facing agent layer where the user already intended to spend it.
+
+</details>
 
 <details>
 <summary><strong>Measured Evidence</strong></summary>
+
+Evidence has been measured in time, throughout cycles of development to production.
 
 ### Repeated Answers
 
@@ -68,138 +215,7 @@ total-development-time claims.
 
 </details>
 
-## The Harness
-
-Modern Snowflake and Databricks already combine ingestion, transformation,
-scheduling, governed meaning, and natural-language analytics. The harness does
-not claim to invent that operating loop. It asks whether the same jobs can live
-in a small repository whose storage, compute, scheduler, knowledge, and client
-surface can be replaced independently.
-
-| Concern | Snowflake | Databricks | The harness |
-|---|---|---|---|
-| Executable business logic | Semantic Views | Metric Views | dbt marts |
-| Institutional context | Semantic metadata and instructions | Genie knowledge store and instructions | Versioned OKF knowledge |
-| Analytical delivery | Cortex Analyst | Genie Agent | MCP exposed for user agents |
-| Query execution | Snowflake warehouse | Databricks SQL warehouse | Replaceable OLAP adapter |
-| Client surface | Platform API and applications | Platform API and applications | Any MCP-capable agent |
-
-This mapping matters. OKF does not replace Semantic Views or Metric Views.
-Those platform objects define executable calculations, dimensions, joins, and
-aggregations. dbt owns that responsibility in the harness. OKF records the
-meaning, caveats, provenance, terminology, and interpretation that should travel
-with those calculations. MCP then exposes the reviewed data and its knowledge
-to user agents.
-
-### 1. The knowledge survives the platform
-
-A Semantic View remains a Snowflake object. A Metric View and Genie Agent
-configuration remain Databricks objects. In the harness, transformations are
-SQL and dbt, institutional knowledge is Markdown, and delivery uses MCP. These
-artifacts remain readable if the storage engine, model, host, or analytical
-client changes.   
-The advantage is **reversibility**: changing infrastructure does
-not require throwing away the organization's explanations with it.
-
-### 2. Changes happen in one reviewable place
-
-The transform, its interpretation, its caveats, and its serving behavior live
-in one repository. A team can review them through ordinary diffs instead of
-coordinating changes across warehouse objects, catalog configuration, agent
-instructions, dashboards, and separate administration surfaces. The harness is
-lean because it reduces control planes, not because enterprise controls are
-useless.
-
-### 3. Meaning and execution stay separate
-
-dbt determines the answer. OKF explains the answer. MCP delivers the answer.
-This separation prevents prose from silently becoming calculation logic while
-allowing institutional context to evolve without rebuilding the warehouse.
-Executable truth remains testable SQL; human context remains readable text.
-
-### 4. User agents keep one stable boundary
-
-User agents connect through MCP. They do not need to know whether a query runs
-in DuckDB, MotherDuck, or another analytical engine. Storage and compute can
-change behind that boundary without asking every user to adopt another client
-or platform-specific agent. The harness owns the changing backend; the user
-agent keeps the same analytical surface.
-
-### 5. Structure is earned incrementally
-
-The harness can begin with one reviewed transform and one adjacent knowledge
-file. More structure is added when a real analytical need appears, not because
-a platform exposes another object type. This keeps early decisions cheap to
-reverse and lets repeated use determine what deserves to become durable.
-
-That reviewed work is reusable. If one unchanged release serves one workflow,
-it carries one operator touch per workflow. If it serves ten workflows, the
-same touch is spread across ten uses: 0.1 per workflow. At one hundred uses it
-is 0.01, and at one thousand it is 0.001. This is not measured human time. It
-is the simple `1 / N` effect of reusing one reviewed release.
-
-![Operator judgment amortized across workflows](assets/operator-amortization.svg)
-
-Operator judgment does not disappear. A change to data, transforms, knowledge,
-or evaluations starts another review cycle. Between those changes, the same
-reviewed surface can serve more workflows without repeating that decision for
-every user.
-
-That is the defensible position: Snowflake and Databricks provide the complete
-loop as integrated platforms. The harness expresses the same loop through open,
-replaceable artifacts. It does not yet prove lower platform cost, faster
-delivery, stronger governance, or greater scale.
-
-One kind of reuse has been measured. Across 24 completed adversarial workflows,
-90.1% of cumulative input tokens came from cache. Only 9.9% of cumulative input was fresh.
-
-![Observed context reuse across completed workflows](assets/context-reuse.svg)
-
-<details>
-<summary><strong>Public Cost Study</strong></summary>
-
-Public pricing pages suggest the harness has a lower operating floor than a
-managed warehouse plus platform-native AI-BI stack for this workload. This is a
-study from published prices, not an invoice or vendor benchmark.
-
-The harness shape here is AWS runtime plus MotherDuck OLAP plus dbt Core. dbt
-Core is open-source transform code in the repository; dbt Cloud seats and
-managed dbt billing are not part of this harness estimate.
-
-An AWS deployment with one small public MCP service, one scheduled refresh
-task, EventBridge Scheduler, S3, ECR, CloudWatch logs, and an application load
-balancer is plausibly a tens-to-low-hundreds monthly system before the OLAP
-platform. The scheduler line item is effectively zero at this scale because
-EventBridge Scheduler includes 14 million monthly invocations in the free tier.
-The fixed AWS tax is more likely to be the public load balancer than the
-scheduled harness job.
-
-| Operating shape | Plausible monthly floor |
-|---|---:|
-| Harness on AWS Fargate plus MotherDuck Lite, if the workload fits included storage and Pulse compute | `$60-$180` |
-| Harness on AWS Fargate plus MotherDuck Business, before heavy compute usage | `$310-$500+` |
-| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, using dbt Core outside Snowflake | `$400-$1,500+` |
-| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, using dbt Core outside Snowflake | `$1,400-$2,900+` |
-
-The Snowflake estimate uses public Enterprise pricing around `$3` per credit,
-Gen1 warehouse rates of 1 credit/hour for X-Small, 2 credits/hour for Small,
-and 4 credits/hour for Medium. The MotherDuck Business estimate starts with the
-public `$250` per organization monthly platform price, then adds the AWS runtime
-floor. MotherDuck usage, storage, read scaling, AI units, Snowflake Cortex,
-Snowflake Intelligence, Databricks SQL warehouse usage, storage, egress,
-support, and enterprise discounts are not included in those rows.
-
-The important cost claim is not that the harness removes AI spend. It redirects
-it. Managed warehouse AI features can charge inside the data platform while the
-user still spends tokens again in a chat or coding agent. The harness keeps the
-pipeline and chart-serving path deterministic, so the recurring platform cost is
-mostly container runtime and storage, while reasoning spend stays at the
-user-facing agent layer where the user already intended to spend it.
-
-</details>
-
-<details>
-<summary><strong>References</strong></summary>
+## References
 
 ### AWS
 
@@ -240,5 +256,3 @@ user-facing agent layer where the user already intended to spend it.
 
 * [OKF specification](https://okf.md/spec/) - the minimal Markdown and YAML convention used for portable organizational knowledge.
 * [OKF FAQ](https://okf.md/faq/) - scope, portability, Git workflow, MCP use, and the explicit distinction between OKF and a data catalog.
-
-</details>

@@ -30,6 +30,10 @@ One row per `source_type` and `source_adapter_name` pair.
 Repeated captures count as separate manifest records. This model does not infer
 source freshness, uniqueness, or analytical quality.
 
+Scheduled shared refreshes exclude `raw_manifest` because it is local capture
+evidence. Treat this table as local-run evidence unless the manifest source is
+explicitly loaded in the current environment.
+
 # Citations
 
 [1] [dbt model](../../transforms/dbt/models/marts/mart_capture_summary.sql)

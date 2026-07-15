@@ -38,9 +38,9 @@ load_dotenv_once()
 mcp = FastMCP(
     "procdork",
     instructions=(
-        "Begin every analytical workflow by reading the knowledge index. Use okf://bundle/index when resources "
-        "are available; otherwise call read_knowledge with path='index'. Follow only the relevant knowledge links "
-        "before table discovery or querying. "
+        "Mandatory workflow: before list_tables, describe_table, or query, first read reviewed knowledge. "
+        "Start with okf://bundle/index when resources are available; otherwise call read_knowledge with path='index'. "
+        "Then follow only the relevant knowledge links before table discovery or querying. "
         "Analytics tools are read-only. "
         "Prefer chartable summaries: find categorical dimensions, numeric measures, and *_bucket time labels before "
         "falling back to plain table output. Do not preflight charts with row-count queries; use knowledge and "
@@ -102,7 +102,7 @@ mcp.resource(
     annotations=READ_ONLY,
 )
 def read_knowledge(path: str = "index") -> str:
-    """Read reviewed knowledge. Call with path='index' before any analytics tool."""
+    """Read reviewed OKF knowledge. Always call with path='index' before list_tables, describe_table, or query."""
     root = KNOWLEDGE_ROOT.resolve()
     requested = path.strip().removesuffix(".md").strip("/") or "index"
     document = (root / requested).resolve()
@@ -130,7 +130,7 @@ def query(
         "auto", "line", "bar", "heatmap", "scatter", "bubble", "histogram", "box", "table"
     ] = "auto",
 ) -> CallToolResult:
-    """Run one read-only, chart-ready SQL query after reading relevant knowledge. Do not use this for row-count preflights."""
+    """Run one read-only, chart-ready SQL query after read_knowledge. Do not use this for row-count preflights."""
     columns, rows, truncated = execute_readonly(sql, MAX_QUERY_ROWS)
     payload = build_chart(columns, rows, title, chart_kind, truncated)
     structured: dict[str, object] = {
@@ -182,7 +182,7 @@ def execute_readonly(
     structured_output=True,
 )
 def list_tables() -> dict[str, object]:
-    """After reading relevant knowledge, list tables that are ready to query."""
+    """List tables that are ready to query, only after read_knowledge and relevant OKF docs."""
     with connect_duckdb() as connection:
         rows = [[public_name] for public_name, *_ in published_tables(connection)]
     return {"columns": ["table_name"], "rows": rows, "truncated": False}
@@ -194,7 +194,7 @@ def list_tables() -> dict[str, object]:
     structured_output=True,
 )
 def describe_table(table_name: str) -> dict[str, object]:
-    """After reading relevant knowledge, describe one table returned by list_tables."""
+    """Describe one table returned by list_tables, only after read_knowledge and relevant OKF docs."""
     with connect_duckdb() as connection:
         connection.execute("set enable_external_access = false")
         matches = [

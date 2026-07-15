@@ -2,6 +2,7 @@ import type { ChartCell, ChartDatum, ChartViewModel, HeatmapMode } from "./chart
 
 type PlotModule = typeof import("@observablehq/plot");
 type PlotOptions = Parameters<PlotModule["plot"]>[0];
+type RectYOptions = NonNullable<Parameters<PlotModule["rectY"]>[1]>;
 type HeatmapBin = Record<string, unknown> & {
   __x: number;
   __y: number;
@@ -125,12 +126,13 @@ function renderHistogram(Plot: PlotModule, target: HTMLElement, chart: ChartView
     marginLeft: 54,
     x: { grid: true, label: null },
     y: { grid: true, label: null },
+    color: chart.series ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS } : undefined,
     style: plotStyle(),
     marks: [
       Plot.ruleY([0]),
       Plot.rectY(
         chart.data,
-        Plot.binX({ y: "count" }, { x: chart.value }),
+        Plot.binX<RectYOptions>({ y: "count" }, { x: chart.value, fill: chart.series ?? SERIES_COLORS[0], inset: 1 }),
       ),
     ],
   } satisfies PlotOptions);

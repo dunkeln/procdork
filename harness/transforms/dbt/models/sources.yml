@@ -6,22 +6,61 @@ sources:
     tables:
       - name: raw_manifest
         description: Raw capture manifest loaded by the harness EL path.
+        columns:
+          - name: artifact_id
+            tests: [not_null, unique]
       - name: raw_evaluation_results
         description: Provider-neutral results written by scheduled evaluator jobs.
       - name: raw_ingestion_events
         description: Append-only completion events emitted by the document-ingestion service.
+        columns:
+          - name: event_id
+            tests: [not_null, unique]
       - name: raw_refresh_runs
         description: Scheduler receipts for source sync and dbt publication outcomes.
+        columns:
+          - name: run_id
+            tests: [not_null, unique]
   - name: app
     schema: main
     tables:
       - name: app_sessions
         description: Demo web chat sessions synced from Neon.
+        columns:
+          - name: slug
+            tests: [not_null, unique]
       - name: app_messages
         description: Demo web chat messages synced from Neon.
+        columns:
+          - name: id
+            tests: [not_null, unique]
       - name: app_message_events
         description: Demo web chat event stream synced from Neon.
+        columns:
+          - name: id
+            tests: [not_null, unique]
       - name: app_sources
         description: Demo web cited sources synced from Neon.
+        columns:
+          - name: url
+            tests: [not_null, unique]
       - name: app_message_sources
         description: Demo web message-source links synced from Neon.
+
+models:
+  - name: mart_ingestion_operations
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+  - name: mart_supplier_claims
+    columns:
+      - name: claim_id
+        tests: [not_null, unique]
+  - name: mart_refresh_runs
+    columns:
+      - name: run_id
+        tests: [not_null, unique]
+  - name: mart_workflow_sessions
+    columns:
+      - name: session_number
+        tests: [not_null, unique]

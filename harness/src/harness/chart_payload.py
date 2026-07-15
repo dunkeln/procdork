@@ -50,7 +50,15 @@ def build_chart(
     truncated: bool = False,
 ) -> ChartPayload:
     if not columns or not rows:
-        raise ValueError("The query returned no chartable rows")
+        return ChartPayload(
+            title=title.strip()[:80] or "Analytics result",
+            chart_kind="table",
+            columns=columns[:6],
+            rows=[],
+            facts=ChartFacts(row_count=0, column_count=len(columns[:6]), truncated=False),
+            key_facts=["The query returned 0 rows."],
+            truncated=False,
+        )
 
     kind = choose_chart_kind(columns, rows, requested_kind)
     if kind == "table":

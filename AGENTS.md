@@ -47,4 +47,4 @@ why it matters, what changed, what was not changed.
 
 ## Top of the tier skills to use
 + @ponytail plugin to keep it relevant across the board.
-+ /isotope skills to build richer and structured logging. Its a personal skills. Update suggestions/failures in [doc](./.codex/memories/isotope_failures.md).
++ /isotope skills to build richer and structured logging. Its a personal skills. Keep project memory notes under [memories](./.codex/memories/).

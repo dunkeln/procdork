@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import duckdb
 
 from ..extraction import HarnessModel
-from .ingestion import ensure_raw_ingestion_events
+from .ingestion import ensure_raw_ingestion_events, merge_raw_ingestion_events
 
 
 CHAT_TABLES = ["sessions", "messages", "message_events", "sources", "message_sources"]
@@ -48,9 +48,23 @@ def sync_neon_chat(
                     f"select count(*) from {target}"
                 ).fetchone()[0]
             if INGESTION_TABLE in source_tables:
-                connection.execute(
-                    f"create or replace table raw_ingestion_events as select * from neon_src.public.{INGESTION_TABLE}"
-                )
+                rows = connection.execute(
+                    f"""
+                    select
+                        event_id,
+                        event_type,
+                        schema_version,
+                        emitted_at,
+                        job_id,
+                        session_id,
+                        turn_id,
+                        status,
+                        duration_ms,
+                        cast(payload as varchar)
+                    from neon_src.public.{INGESTION_TABLE}
+                    """
+                ).fetchall()
+                merge_raw_ingestion_events(connection, rows)
             else:
                 ensure_raw_ingestion_events(connection)
             tables["raw_ingestion_events"] = connection.execute(

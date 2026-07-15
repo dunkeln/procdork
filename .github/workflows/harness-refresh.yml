@@ -51,6 +51,8 @@ jobs:
         name: Build independent dbt models
         continue-on-error: true
         run: |
+          # raw_manifest is local capture evidence; scheduled refresh publishes models
+          # that can be rebuilt from synced app/evaluation/ingestion sources.
           uv run dbt build \
             --project-dir transforms/dbt \
             --profiles-dir "$RUNNER_TEMP/dbt-profiles" \

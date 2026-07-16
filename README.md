@@ -121,18 +121,17 @@ scheduled harness job.
 
 | Operating shape | Plausible monthly floor |
 |---|---:|
-| Harness on AWS Fargate plus MotherDuck Lite, if the workload fits included storage and Pulse compute | `$60-$180` |
-| Harness on AWS Fargate plus MotherDuck Business, before heavy compute usage | `$310-$500+` |
-| Snowflake Enterprise X-Small or Small warehouse, 4-8 hr/day, **using dbt Core outside Snowflake** | `$400-$1,500+` |
-| Snowflake Enterprise Small or Medium warehouse, 8 hr/day, using dbt Core outside Snowflake | `$1,400-$2,900+` |
+| Agent Harness: standalone AWS ALB, Fargate, and MotherDuck Lite | `$45-$110` realistic |
+| Agent Harness reusing an existing ALB | `$25-$75` |
+| Agent Harness stress range for heavier use | `$100-$200` |
+| Snowflake-centered stack | `$500-$2,000+` |
+| Databricks-centered stack | `$500-$2,500+` |
+| Extraction-heavy managed ELT before warehouse/lakehouse compute | `$100-$500+` |
 
-The Snowflake estimate uses public Enterprise pricing around `$3` per credit,
-Gen1 warehouse rates of 1 credit/hour for X-Small, 2 credits/hour for Small,
-and 4 credits/hour for Medium. The MotherDuck Business estimate starts with the
-public `$250` per organization monthly platform price, then adds the AWS runtime
-floor. MotherDuck usage, storage, read scaling, AI units, Snowflake Cortex,
-Snowflake Intelligence, Databricks SQL warehouse usage, storage, egress,
-support, and enterprise discounts are not included in those rows.
+The managed-platform rows are comparison envelopes, not vendor benchmarks.
+MotherDuck Business pricing, Snowflake Cortex, Snowflake Intelligence,
+Databricks SQL warehouse usage, storage, egress, support, and enterprise
+discounts are not included in those rows.
 
 The important cost use is not that the harness removes AI spend. It redirects
 it. In managed platforms, AI usage is metered inside the platform while the user

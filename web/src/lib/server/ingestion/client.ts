@@ -19,7 +19,8 @@ export function getIngestionServiceUrl() {
 	return (
 		process.env.INGESTION_SERVICE_URL ??
 		process.env.DOCUMENT_INGESTION_URL ??
-		process.env.INGESTION_URL
+		process.env.INGESTION_URL ??
+		vercelIngestionServiceUrl()
 	);
 }
 
@@ -27,6 +28,11 @@ function ingestionUrl(path: string, serviceUrl: string) {
 	const url = new URL(serviceUrl);
 	url.pathname = `${url.pathname.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 	return url;
+}
+
+function vercelIngestionServiceUrl() {
+	const host = process.env.VERCEL_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
+	return host ? `https://${host}/svc/ingestion` : undefined;
 }
 
 export function sourceIdFor(url: string) {

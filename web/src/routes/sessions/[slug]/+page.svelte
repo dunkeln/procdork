@@ -8,7 +8,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { runOperatorSimulation } from '$lib/simulations/driver';
 	import { procurementOperators, type ProcurementOperator } from '$lib/simulations/operators';
-	import { ChevronDown, Play, Search, SendHorizontal, X } from '@lucide/svelte';
+	import { BookOpen, ChevronDown, Play, Search, SendHorizontal, X } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -427,6 +427,15 @@
 				</span>
 			</a>
 			<div class="flex items-center gap-2">
+				<Button
+					href={resolve('/docs')}
+					variant="outline"
+					size="sm"
+					class="border-[#10120f] bg-[#10120f] text-white hover:bg-[#10120f]/90 hover:text-white"
+				>
+					<BookOpen />
+					Docs
+				</Button>
 				<Button
 					type="button"
 					variant="outline"

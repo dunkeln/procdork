@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="web/static/procdork-logo.png" alt="procdork logo" width="180" />
+</p>
+
 <h1 align="center">procdork</h1>
 
 
@@ -11,6 +15,7 @@ For this slice, that is **7 governed functions / 1 reviewed surface**, or
 about **7x operator surface power**. That is not a measured staffing or
 wall-clock reduction.
 
+Additional context worth reading in [llms-txt](https://procdork.vercel.app/llms-full.txt).
 
 ## The Harness
 

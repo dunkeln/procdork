@@ -1,0 +1,274 @@
+# Procdork full LLM briefing
+
+Canonical site: https://procdork.vercel.app/docs
+Repository: https://github.com/dunkeln/procdork
+MCP endpoint: https://procdork.vercel.app/mcp
+
+This file is the distilled agent-readable context for Procdork. It is written for LLMs, coding agents, client agents, and reviewers that need the whole project shape without scraping every rendered docs page.
+
+## What Procdork is
+
+Procdork is a data and lazy-evals harness built around a thin vertical slice of real procurement work. The application researches suppliers from public web evidence, preserves source traces, enriches document-like evidence through an ingestion service, persists interaction and event data, and turns that data into evaluation and analytics surfaces.
+
+The project is not positioned as another standalone dashboard. Its operating assumption is that modern operators increasingly work inside Claude, ChatGPT, Codex, Cursor, or similar agent sessions. Procdork makes reviewed procurement intelligence, source evidence, and analytical context available inside those sessions through MCP and lightweight web surfaces.
+
+The important product claim is bounded: Procdork proves a small, governed procurement-intelligence loop before buying or building a heavier warehouse, lakehouse, dashboard, orchestration, or auth platform around it.
+
+## Core idea
+
+Coding agents are part of the infrastructure. They can accelerate software and data workflows, but they also amplify anchoring bias, unsupported execution, and poorly governed reconciliation. Procdork treats model evaluation and operator review as part of the system, not as a later QA phase.
+
+The harness exists to keep agentic work inside evidence boundaries:
+
+- preserve what was retrieved or observed
+- attach source URLs and retrieval time
+- separate source evidence from promoted analytical facts
+- let a transformation layer decide confidence, conflicts, and usefulness
+- expose reviewed data through MCP instead of forcing users into a separate BI tool
+
+## The vertical slice
+
+The first product slice is supplier discovery and sourcing research. It can search for public supplier information such as MOQs, RFx paths, lead-time evidence, certifications, SDS/COA/spec sheets, pricing signals, and related procurement details.
+
+The web app is a SvelteKit application with a chat-style procurement surface. It uses server-side runtime tools for web search/fetch, persists session and message state in Neon Postgres, and keeps the deployed app stateless. The database is the source of truth.
+
+MIME-like evidence such as PDFs, docs, and spreadsheets is not treated as a front-end parsing problem. Those document URLs are routed to a document-layout-aware Python ingestion service. The service extracts structured document signals and returns dated information that can enrich chat answers and later analytical tables.
+
+## Runtime behavior
+
+The runtime starts from user or simulated-operator messages. It can:
+
+- search public web evidence
+- fetch source pages
+- identify document-like URLs
+- cite retrieved sources
+- stream assistant responses
+- persist chat sessions and messages
+- optionally suggest or draft supplier outreach email when the user explicitly needs it
+- record event traces for downstream evaluation
+
+The runtime is deliberately not a large orchestration framework. It avoids LangChain-style sprawl unless the workflow proves it needs it. The first useful boundary is simpler: chat plus tools plus persistence plus evidence metadata.
+
+## Data lifecycle
+
+Procdork follows ELT: Extract, Load, Transform.
+
+### Extract and load
+
+Extraction captures source events, application events, document traces, supplier evidence, and tool activity. dltHub-style extraction is used as the boring replayable loading boundary: extractors pull raw source records into durable shape with provenance close to the payload.
+
+The system intentionally allows partial and messy source records to land. Procurement source quality is uneven, so the extractor should preserve what happened and when rather than blocking on a perfect schema too early.
+
+### Transform
+
+The transform layer decides what becomes analytical truth. dbt and SQL transformations promote stable marts from raw or semi-raw evidence. This layer handles supplier claims, source coverage, confidence, conflicts, benchmark traces, and workflow health.
+
+The transform layer is the human-operator-focused boundary. It is where operators and their agents can promote interpretable data while reducing the blast radius of unsupervised agent execution.
+
+### Knowledge layer
+
+Procdork pairs structured transforms with markdown knowledge, especially OKF-style product intelligence notes. The knowledge layer carries caveats, charting rules, interpretation rules, provenance notes, and business context for promoted marts.
+
+This is intentionally simpler than maintaining embeddings for every change. Markdown remains readable, easy to update, and crawlable by agents. The idea is to let institutional context evolve alongside dbt models without turning every query change into application plumbing.
+
+### Surfacing
+
+Analytics should surface where operators already work. Instead of requiring a separate dashboard or scheduled report, Procdork exposes reviewed surfaces through MCP apps and agent-readable docs. MCP can carry transient widgets, charts, and actions inside Claude, ChatGPT, or other MCP-capable sessions.
+
+The division is:
+
+- dbt determines the answer
+- OKF explains the answer
+- MCP delivers the answer
+
+## Persistence model
+
+The web app is stateless. Neon Postgres holds sessions, messages, events, source evidence, and related persisted state. A deployed instance should be replaceable without losing working context.
+
+The runtime feeds only a bounded message window back into the model. Long-term state belongs in the database and analytical layers, not in browser memory.
+
+## Document ingestion boundary
+
+Document ingestion is separated from the web runtime. The web app can discover and cite document-like URLs, but layout-aware extraction belongs to the Python microservice.
+
+That microservice should:
+
+- accept document URLs or document payload references
+- infer or preserve MIME type
+- parse layout-aware content
+- return structured document evidence
+- preserve source URL and retrieval time
+- emit canonical fields that downstream transforms can promote
+
+The web app should not become a PDF reader, spreadsheet parser, or document ETL engine. Its job is to route evidence and show the result.
+
+## Operator-in-the-loop
+
+Human-in-the-loop is framed here as Operator-in-the-Loop (OITL). The operator is not merely a reviewer; the operator is a human equipped with agents at execution gates.
+
+OITL matters at three structural boundaries:
+
+- Data boundary: extraction, loading, provenance, source coverage
+- ML/evaluation boundary: simulations, judge results, benchmark traces, failure modes
+- Forward-deployed boundary: product knowledge, client-specific caveats, workflow interpretation
+
+The operator maintains execution through dbt SQL transforms, notebook-based discovery, and product knowledge notes. A useful side effect is evidence-led schema evolution: recurring questions, gaps, and analytical shapes justify schema changes instead of the schema being designed upfront from assumptions.
+
+## Development decisions
+
+Procdork was built with a few explicit development decisions:
+
+- Dependency injection over inheritance where external adapters should not alter harness logic.
+- YAGNI over speculative scaffolding.
+- Anchoring bias treated as a development risk. Early stated facts, targets, or framing should remain visible assumptions, not implementation truth.
+- One thin vertical slice before broader platformization.
+- No broad RBAC, vector store, full dashboard, mature backfills, self-healing operations, or OKF/schema sync automation until the workflow proves the need.
+
+These decisions are part of the harness story: the project shows judgment by refusing to build everything too early.
+
+## Benchmarks and evidence
+
+The benchmark page explains the harness in simple terms: if Claude takes different paths, uses different words, or sees rough data, the core facts should still land in the same place.
+
+Repeated-answer run:
+
+- 64 runs
+- 192 calls
+- core facts stayed stable across:
+  - 5 sessions
+  - 8 messages
+  - 46 events
+  - 29 cited sources
+
+Adversarial run:
+
+- 24 workflows completed under messy conditions
+- 313 MCP calls
+- 26 tool errors absorbed without fake answers
+
+Tool-call pressure:
+
+- typical workflow: 13 calls
+- heavy workflow: 28 calls
+
+Context reuse:
+
+- 90.1% cached context
+- 9.9% fresh context
+
+Interpretation: context reuse is not the harness itself. The useful signal is that the harness provides stable retrieved context, so Claude can keep answering from cached session material rather than rebuilding the world each turn.
+
+A good run gets more useful with each turn. It cites where facts came from, admits what is missing, avoids fake certainty, and does not repeat the same search unless new evidence appears.
+
+## Cost forecast
+
+The deployment posture is deliberately small.
+
+Assuming 1-3 maintainers, a standalone deployment is one AWS ALB, one AWS Fargate service, and MotherDuck for hosted analytics.
+
+Estimated monthly ranges:
+
+- realistic deployment: $45-$110/month
+- reusing an existing ALB: $25-$75/month
+- stress range for heavier use: $100-$200/month
+
+Cost surfaces:
+
+- AWS ALB: public front door for the service, roughly $20-$35/month realistic and $35-$60/month stress.
+- AWS Fargate: small always-on server running the harness, roughly $20-$55/month realistic and $50-$100/month stress.
+- MotherDuck Lite + Pulse: hosted database and query engine, roughly $4-$20/month realistic and $20-$50/month stress.
+- Existing Claude/Codex subscriptions: $0 incremental to the project bill because they are already paid outside the project infrastructure.
+
+Comparison stance:
+
+- Agent Harness: prove the loop cheaply.
+- Snowflake-centered stack: often $500-$2,000+ once warehouse credits, ingestion, AI/serverless features, and refresh cadence are included.
+- Databricks-centered stack: often $500-$2,500+ depending on DBUs, SQL, jobs, serverless, and cloud runtime choices.
+- Managed ELT stack: useful when connector management is the problem, but often premature for one narrow operator loop.
+
+The defensible cost claim is narrow: keep the first version below a heavier multi-service platform bill while proving which procurement intelligence surfaces deserve investment.
+
+## How to use Procdork from an agent
+
+MCP configuration:
+
+- name: procdork
+- URL: https://procdork.vercel.app/mcp
+- compatible with: Claude, Codex, Cursor, and other MCP-capable clients
+
+Useful questions for a client agent:
+
+- What is Procdork, and what operating problem does it solve?
+- Explain the source, transform, knowledge, and MCP layers.
+- What measured evidence supports the stability of the harness?
+- How does operator-surface power reduce coordination tax?
+- What needs to be configured on day zero for a procurement environment?
+- Which suppliers look most supported by evidence, and where should I be careful?
+- What is missing before we can confidently rank suppliers?
+- Which source domains carry the most evidence?
+- Which tools are doing the most work, and where are they failing?
+- Are recent sessions getting faster or slower?
+- What should I not claim from the current data?
+
+## Example prompt shapes
+
+Supplier evidence coverage:
+
+- Which suppliers look most supported by evidence, and where should I be careful?
+- What can I safely claim about suppliers from the current data?
+
+Evidence gaps:
+
+- Show me where evidence is strong, thin, or missing across the supplier workflow.
+- What is missing before we can confidently rank suppliers?
+
+Source concentration:
+
+- Which source domains carry the most evidence, and are any overrepresented?
+- What sources should I inspect first if I want to verify supplier claims?
+
+Tool reliability:
+
+- Which tools are doing the most work, and where are they failing?
+- Show tool activity by status.
+
+Session heatmap:
+
+- Show tool usage by session and tell me which sessions look unusual.
+- Where do tool errors cluster by session?
+
+Freshness:
+
+- What looks fresh, what looks stale, and what changed recently?
+- Which pipeline runs look stale?
+
+Demo-safe answer:
+
+- Give me the strongest supported claim and the biggest caveat.
+- What should I not claim based on the current data?
+
+## Important caveats
+
+Procdork should not claim perfect supplier truth from public data. It should make evidence quality visible.
+
+Thin evidence should remain thin. Missing certifications should stay missing. Conflicting supplier claims should be localized instead of overwritten. Direct quote, quote-ready pricing, MOQ, lead time, and certification claims should be tied back to source URLs and retrieval times.
+
+The first deployment does not know a customer's suppliers before sources exist. Day-zero readiness means the operating pattern is ready:
+
+1. connect sources
+2. preserve raw evidence
+3. run extraction and loading
+4. transform into reviewed marts
+5. attach OKF interpretation
+6. expose through MCP
+7. evaluate outputs against evidence boundaries
+
+## Canonical docs routes
+
+- Architecture: https://procdork.vercel.app/docs
+- Cost forecast: https://procdork.vercel.app/docs/cost-forecast
+- How to: https://procdork.vercel.app/docs/how-to
+- Examples: https://procdork.vercel.app/docs/examples
+- Benchmarks: https://procdork.vercel.app/docs/benchmarks
+- Decision boundary: https://procdork.vercel.app/docs/decisions
+

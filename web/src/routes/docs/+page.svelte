@@ -97,8 +97,9 @@
 <p>
 	<strong>TL;DR</strong> on the knowledge layer. The points above lead to the the adoption of OKF, a markdown
 	format. OKF shines where maintainance for vector embeddings becomes a costly piece of maintenance. It
-	was first established by Andrej Karpathy and later used in production by Google BigQuery and it is being
-	brought here too. This keeps knowledge readable while being faster and serverly less convoluted to iterate.
+	was first established first by Andrej Karpathy as "llm wiki" and later adopted in production by Google
+	BigQuery, now borrowed here too. This keeps knowledge readable while being faster and severely less
+	convoluted to iterate.
 </p>
 
 <p>More material:</p>

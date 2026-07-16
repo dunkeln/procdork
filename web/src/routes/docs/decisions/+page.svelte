@@ -29,9 +29,9 @@
 <p>
 	A positive side-effect from such structure and the product intelligence notes (OKF) is organic and
 	evidence-led schema evolution as surfaced knowledge reveals recurring questions, gaps and useful
-	analytical shapes. This helps an operator iterate existing transforms over redesigning from scratch
-	with no context. That means the database structure doesn't prescribe a STAR schema, Constellation
-	schema or Snowflake schema. Adoption ties with a justification for it.
+	analytical shapes. This helps an operator iterate existing transforms over redesigning from
+	scratch with no context. That means the database structure doesn't prescribe a STAR schema,
+	Constellation schema or Snowflake schema. Adoption ties with a justification for it.
 </p>
 
 <img
@@ -70,8 +70,9 @@ to scale vertically, in contrast to horizontally maintained distributed systems.
 		<strong>Dependency Injection</strong><br />
 		<em>
 			The harness is its own stable boundary. External adapters and sources shouldn't alter the
-			harness logic. That keeps it stable. Dependency injection is a step from class inheritance
-			that compounds to unnecessary code bloat and harness maintainability.
+			harness logic. That keeps it stable. Dependency injection aka composition is a different
+			directon from class inheritance that compounds to unnecessary code bloat and harness
+			maintainability.
 		</em>
 	</li>
 	<li>
@@ -111,8 +112,8 @@ to scale vertically, in contrast to horizontally maintained distributed systems.
 	</li>
 	<li>Self-healing operations. Redirected time to build the everything else 💀.</li>
 	<li>
-		Automatically syncing OKF Knowledge to schema diffs. It's a simple fix with a pre-commit hook for
-		agents. Didn't make skills another topic to address, to maintain brevity.
+		Automatically syncing OKF Knowledge to schema diffs. It's a simple fix with a pre-commit hook
+		for agents. Didn't make skills another topic to address, to maintain brevity.
 	</li>
 </ul>
 

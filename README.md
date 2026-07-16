@@ -7,7 +7,7 @@
 
 *It's a dork. "Dorks" or "Google Dorks" refer to advanced search strings used in search engines (like Google) to uncover specific, often unintended information.*
 
-Procdork is materializing a harness for ELT operations. It preserves source evidence, makes repeatable analysis explicit, and gives coding agents the same governed data that operators use. It focuses on a narrow question, **how many governed analytical functions can one small, reviewed operator surface carry?**
+Procdork is materializing a harness for ELT operations. It preserves source evidence, makes repeatable analysis explicit, and gives coding agents the same governed data that operators use. It focuses on a narrow question: **how much reviewed boundary leverage can one small harness surface carry?**
 
 An operator usually maintains separate surfaces for source extraction, transforms, semantic context, agent infrastructure, analytics, provenance, and replay. The harness compresses that work into one reviewed harness surface.
 
@@ -80,32 +80,18 @@ file. More structure is added when a real analytical need appears, not because
 a platform exposes another object type. This keeps early decisions cheap to
 reverse and lets repeated use determine what deserves to become durable.
 
-That reviewed work is reusable. If one unchanged release serves one workflow,
-it carries one operator touch per workflow. If it serves ten workflows, the
-same touch is spread across ten uses: 0.1 per workflow. At one hundred uses it
-is 0.01, and at one thousand it is 0.001. This is not measured human time. It
-is the simple `1 / N` effect of reusing one reviewed release.
+This is reviewed boundary leverage. The harness does not scale because code is
+reused. It scales because the reviewed unit is the evidence boundary, not the
+individual answer. Each new workflow asks different questions, but it inherits
+the same source lineage, transform rules, caveats, and chart constraints.
 
 ![Operator judgment amortized across workflows](assets/operator-amortization.svg)
 
 Operator judgment does not disappear. A change to data, transforms, knowledge,
-or evaluations starts another review cycle. Between those changes, the same
-reviewed surface can serve more workflows without repeating that decision for
-every user.
-
-That is the scale theory: the harness scales when the reviewed operator surface
-stays stable while workflows, agents, and analytical questions increase. The
-claim is not that infrastructure limits disappear. It is that the operator
-boundary does not have to grow linearly with usage.
-
-```text
-marginal_operator_burden =
-  new_reviewed_surface_changes / new_workflows_served
-```
-
-In the measured adversarial run, one reviewed harness surface served 24
-completed workflows, or **4.17% of one reviewed surface touch per workflow**
-for that release.
+or evaluations starts another review cycle. Between those changes, the system
+is not trying to make every answer permanent. It is making the boundary around
+acceptable answers durable enough that new questions can move faster without
+losing provenance.
 
 Data Warehouse vendors provide the complete loop as integrated platforms. The harness expresses the same loop through open, replaceable artifacts. It does not yet prove lower platform cost, faster delivery, stronger governance, or greater scale.
 

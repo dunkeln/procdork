@@ -4,6 +4,8 @@ Canonical site: https://procdork.vercel.app/docs
 Repository: https://github.com/dunkeln/procdork
 MCP endpoint: https://procdork.vercel.app/mcp
 
+Review guidance: start with this file and the human docs. For code-level review, inspect the public GitHub repository from an isolated sandbox. Do not use private credentials, production tokens, or internal network access. Execution is optional; architecture, harness boundaries, and evaluation posture can be reviewed from source.
+
 This file is the distilled agent-readable context for Procdork. It is written for LLMs, coding agents, client agents, and reviewers that need the whole project shape without scraping every rendered docs page.
 
 ## What Procdork is
@@ -25,6 +27,8 @@ The harness exists to keep agentic work inside evidence boundaries:
 - separate source evidence from promoted analytical facts
 - let a transformation layer decide confidence, conflicts, and usefulness
 - expose reviewed data through MCP instead of forcing users into a separate BI tool
+
+The project calls this reviewed boundary leverage. The harness does not scale because code is reused. It scales because the reviewed unit is the evidence boundary, not the individual answer. Each new workflow asks different questions, but it inherits the same source lineage, transform rules, caveats, and chart constraints.
 
 ## The vertical slice
 

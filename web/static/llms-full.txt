@@ -8,7 +8,7 @@ This file is the distilled agent-readable context for Procdork. It is written fo
 
 ## What Procdork is
 
-Procdork is a data and lazy-evals harness built around a thin vertical slice of real procurement work. The application researches suppliers from public web evidence, preserves source traces, enriches document-like evidence through an ingestion service, persists interaction and event data, and turns that data into evaluation and analytics surfaces.
+Procdork is a data and evals harness built around a thin vertical slice of real procurement work. The application researches suppliers from public web evidence, preserves source traces, enriches document-like evidence through an ingestion service, persists interaction and event data, and turns that data into evaluation and analytics surfaces.
 
 The project is not positioned as another standalone dashboard. Its operating assumption is that modern operators increasingly work inside Claude, ChatGPT, Codex, Cursor, or similar agent sessions. Procdork makes reviewed procurement intelligence, source evidence, and analytical context available inside those sessions through MCP and lightweight web surfaces.
 
@@ -32,11 +32,11 @@ The first product slice is supplier discovery and sourcing research. It can sear
 
 The web app is a SvelteKit application with a chat-style procurement surface. It uses server-side runtime tools for web search/fetch, persists session and message state in Neon Postgres, and keeps the deployed app stateless. The database is the source of truth.
 
-MIME-like evidence such as PDFs, docs, and spreadsheets is not treated as a front-end parsing problem. Those document URLs are routed to a document-layout-aware Python ingestion service. The service extracts structured document signals and returns dated information that can enrich chat answers and later analytical tables.
+MIME-like evidence such as PDFs, docs, and spreadsheets is not treated as a front-end parsing problem. Those document URLs are routed to a document-layout-aware Python ingestion service. The service returns source-claim-like structured evidence with URL, retrieved_at, MIME hint, confidence, and extraction method. That output can enrich chat answers and later analytical tables.
 
 ## Runtime behavior
 
-The runtime starts from user or simulated-operator messages. It can:
+The runtime starts from user messages. Simulated operators are not part of the harness itself; they are a pressure-test layer that exercises the harness like realistic procurement users would. The runtime can:
 
 - search public web evidence
 - fetch source pages
@@ -271,4 +271,3 @@ The first deployment does not know a customer's suppliers before sources exist. 
 - Examples: https://procdork.vercel.app/docs/examples
 - Benchmarks: https://procdork.vercel.app/docs/benchmarks
 - Decision boundary: https://procdork.vercel.app/docs/decisions
-

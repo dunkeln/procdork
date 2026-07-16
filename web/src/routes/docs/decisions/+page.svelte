@@ -13,7 +13,7 @@
 <h1>Decision boundary</h1>
 
 <p>
-	Building on the core idea, Human-in-the-loop is critical step in agentic workflows. Here it is
+	Building on the core idea, human-in-the-loop is a critical step in agentic workflows. Here it is
 	referenced as Operator-in-the-Loop (OITL). The distinction is important because it defines humans
 	equipped with agents at execution gates, becoming operators.
 </p>
@@ -27,9 +27,9 @@
 </p>
 
 <p>
-	A positive side-effect from such structure and the product intelligence notes(OKF) is organic and
+	A positive side-effect from such structure and the product intelligence notes (OKF) is organic and
 	evidence-led schema evolution as surfaced knowledge reveals recurring questions, gaps and useful
-	anaytical shapes. This helps an operator iterate existing transforms over redesigning from scratch
+	analytical shapes. This helps an operator iterate existing transforms over redesigning from scratch
 	with no context. That means the database structure doesn't prescribe a STAR schema, Constellation
 	schema or Snowflake schema. Adoption ties with a justification for it.
 </p>
@@ -40,8 +40,8 @@
 	alt="Sketch of the harness boundary showing shared scheduling policies, extraction and loading, transformation surface plus institutional information, and the MCP boundary."
 />
 
-The ELT pipeline, with the harness re-adoption has been packaged as one compute unit, easier to
-scale vertically, contrast to horizontal and maintained distributed systems.
+The ELT pipeline, with the harness readoption, is packaged as one compute unit. That makes it easier
+to scale vertically, in contrast to horizontally maintained distributed systems.
 
 <div class="file-tree" aria-label="Harness file tree">
 	<div class="tree-entry tree-root"><Folder size={16} aria-hidden="true" /> harness</div>
@@ -96,7 +96,7 @@ scale vertically, contrast to horizontal and maintained distributed systems.
 
 <ul>
 	<li>
-		MCP apps are powerful way to have stateless widgets served as BI dashboards and charts. I've
+		MCP apps are a powerful way to have stateless widgets served as BI dashboards and charts. I've
 		kept it for future work to understand scope and requirements before execution. Recommended <u
 			><a href="https://www.youtube.com/watch?v=sAOBXCDiDOs&t=970s">watch.</a></u
 		>
@@ -111,7 +111,7 @@ scale vertically, contrast to horizontal and maintained distributed systems.
 	</li>
 	<li>Self-healing operations. Redirected time to build the everything else 💀.</li>
 	<li>
-		Automatically syncing OKF Knowledge to schema diffs. Its a simple fix with a pre-commit hook for
+		Automatically syncing OKF Knowledge to schema diffs. It's a simple fix with a pre-commit hook for
 		agents. Didn't make skills another topic to address, to maintain brevity.
 	</li>
 </ul>

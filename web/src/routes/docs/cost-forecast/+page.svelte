@@ -87,7 +87,7 @@
 </table>
 
 <p>
-	If Waystation already has an application load balancer for internal web services, Procdork can
+	If Waystation already has an application load balancer for internal web services, the harness can
 	likely reuse it with a separate listener rule or target group. That makes the incremental AWS bill
 	mostly Fargate, as long as the existing ALB is not near its routing, TLS, security, or traffic
 	limits.
@@ -193,7 +193,7 @@
 </ul>
 
 <p>
-	The defensible claim is narrow. Waystation keeps the first version below a bigger multi-service
+	The defensible claim is narrow. The harness keeps the first version below a bigger multi-service
 	platform bill while it proves which procurement intelligence surfaces deserve heavier investment.
 	This is possible because the harness design is vendor neutral.
 </p>

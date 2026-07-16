@@ -6,7 +6,7 @@
 	/>
 </svelte:head>
 
-<h1>The data & lazy evals harness</h1>
+<h1>The data & evals harness</h1>
 
 <blockquote>
 	<p>
@@ -34,14 +34,15 @@
 <h2>Simulation to harness</h2>
 
 <p>
-	For this harness to build in alignment as embedded service (over another dashboard) ,and
-	mitigating coordination issues and adoption bottlenecks I built a thin working slice for discovery
-	on publicly available supplier information: MOQs, RFx, lead-time evidence, and related sourcing
-	signals. It is a node application with by web fetch and browser subagent work scraping information
-	into structured shape. MIME formats such as PDFs, docs, and spreadsheets are sent as background
-	tasks to a document-layout aware Python microservice. The microservice response enriches chat with
-	dated information. The multi-step chat runtime uses surfaced evidence, enriched responses, and an
-	optional follow-up for drafting supplier email.
+	For this harness to align as an embedded service instead of another dashboard, I built a thin
+	working slice for discovery on publicly available supplier information: MOQs, RFx, lead-time
+	evidence, and related sourcing signals. Simulation sits outside the harness itself; it is the
+	pressure-test layer used to exercise the harness like real operators would. The application uses
+	web fetch and browser subagent work to scrape information into structured shape. MIME formats such
+	as PDFs, docs, and spreadsheets are sent as background tasks to a document-layout-aware Python
+	microservice. The service returns source-claim-like structured evidence with URL, retrieved_at,
+	MIME hint, confidence, and extraction method. The multi-step chat runtime uses surfaced evidence,
+	enriched responses, and an optional follow-up for drafting supplier email.
 </p>
 
 <p>
@@ -63,7 +64,7 @@
 
 <h3>Extraction and loading</h3>
 <p>
-	Extraction is a dltHub extraction on captured strucutured data from sources. That gives the
+	Extraction is a dltHub extraction on captured structured data from sources. That gives the
 	harness a boring, replayable loading boundary instead of custom one-off scripts for every source.
 	The useful part is the contract: extractors pull source events and documents into a durable shape,
 	keep provenance close to the payload, and let the downstream transform layer decide what becomes
@@ -95,11 +96,10 @@
 </ul>
 
 <p>
-	<strong>TL;DR</strong> on the knowledge layer. The points above lead to the the adoption of OKF, a markdown
-	format. OKF shines where maintainance for vector embeddings becomes a costly piece of maintenance. It
-	was first established first by Andrej Karpathy as "llm wiki" and later adopted in production by Google
-	BigQuery, now borrowed here too. This keeps knowledge readable while being faster and severely less
-	convoluted to iterate.
+	<strong>TL;DR</strong> on the knowledge layer. The points above lead to the adoption of OKF, a markdown
+	format. OKF shines where maintenance for vector embeddings becomes costly. It was first established
+	by Andrej Karpathy as "llm wiki" and later adopted in production by Google BigQuery, now borrowed here
+	too. This keeps knowledge readable while being faster and far less convoluted to iterate.
 </p>
 
 <p>More material:</p>

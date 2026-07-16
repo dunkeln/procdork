@@ -82,7 +82,7 @@
 		<h2>Test 2: give it messy data and see if it lies.</h2>
 		<p>
 			This is the adversarial test for sanity. Some evidence was intentionally missing or stale. The
-			harness evidenced enough for Claude to say “I don’t know” instead of pretending.
+			harness preserved enough evidence for Claude to say “I don’t know” instead of pretending.
 		</p>
 	</section>
 
@@ -128,7 +128,7 @@
 		<div>
 			<h2>Context reuse is the useful signal.</h2>
 			<p>
-				Most of the context was reused over getting rebuilt. The harness provided stable retrieved
+				Most of the context was reused instead of rebuilt. The harness provided stable retrieved
 				context, so Claude could keep answering from cached session material instead of re-reading
 				the world each turn.
 			</p>

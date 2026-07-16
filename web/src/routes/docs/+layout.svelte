@@ -7,7 +7,7 @@
 <section class="min-h-dvh bg-[#f8faf6] px-4 py-8 text-[#10120f] sm:px-6 lg:px-8">
 	<div class="docs-shell">
 		<DocsNav />
-		<article class="border border-[#10120f] bg-white p-6 shadow-[6px_6px_0_#10120f] sm:p-10">
+		<article class="docs-article border border-[#10120f] bg-white p-6 shadow-[6px_6px_0_#10120f] sm:p-10">
 			<a class="github-link" href="https://github.com/dunkeln/procdork" target="_blank" rel="noreferrer">
 				<svg viewBox="0 0 24 24" aria-hidden="true">
 					<path
@@ -58,13 +58,13 @@
 		fill: currentColor;
 	}
 
-	:global(article h1),
-	:global(article h2),
-	:global(article h3) {
+	:global(.docs-article h1),
+	:global(.docs-article h2),
+	:global(.docs-article h3) {
 		margin: 0;
 	}
 
-	:global(article h1) {
+	:global(.docs-article h1) {
 		margin: 0 0 16px;
 		border-bottom: 2px solid #10120f;
 		padding-right: 120px;
@@ -74,7 +74,7 @@
 		line-height: 0.95;
 	}
 
-	:global(article h2) {
+	:global(.docs-article h2) {
 		margin-top: 30px;
 		margin-bottom: 10px;
 		font-size: 1.05rem;
@@ -82,7 +82,7 @@
 		line-height: 1.25;
 	}
 
-	:global(article h3) {
+	:global(.docs-article h3) {
 		margin-top: 22px;
 		margin-bottom: 6px;
 		font-size: 1rem;
@@ -90,47 +90,47 @@
 		line-height: 1.3;
 	}
 
-	:global(article p),
-	:global(article li) {
+	:global(.docs-article p),
+	:global(.docs-article li) {
 		color: #363d35;
 		font-size: 1rem;
 		line-height: 1.58;
 	}
 
-	:global(article p),
-	:global(article ul),
-	:global(article ol),
-	:global(article table) {
+	:global(.docs-article p),
+	:global(.docs-article ul),
+	:global(.docs-article ol),
+	:global(.docs-article table) {
 		margin-top: 0;
 		margin-bottom: 16px;
 	}
 
-	:global(article ol),
-	:global(article ul) {
+	:global(.docs-article ol),
+	:global(.docs-article ul) {
 		padding-left: 1.15rem;
 	}
 
-	:global(article ul) {
+	:global(.docs-article ul) {
 		list-style-type: square;
 	}
 
-	:global(article ul li::marker) {
+	:global(.docs-article ul li::marker) {
 		color: #10120f;
 		font-size: 0.82em;
 	}
 
-	:global(article li + li) {
+	:global(.docs-article li + li) {
 		margin-top: 8px;
 	}
 
-	:global(article code) {
+	:global(.docs-article code) {
 		border: 1px solid #dfe5dc;
 		background: #f8faf6;
 		padding: 0.08rem 0.24rem;
 		font-size: 0.88em;
 	}
 
-	:global(article blockquote) {
+	:global(.docs-article blockquote) {
 		margin: 0 0 22px;
 		border: 1px solid #dfe5dc;
 		border-left: 4px solid #10120f;
@@ -139,11 +139,11 @@
 		color: #363d35;
 	}
 
-	:global(article blockquote p) {
+	:global(.docs-article blockquote p) {
 		margin: 0;
 	}
 
-	:global(article table) {
+	:global(.docs-article table) {
 		display: block;
 		width: 100%;
 		overflow-x: auto;
@@ -151,21 +151,21 @@
 		font-size: 0.92rem;
 	}
 
-	:global(article th),
-	:global(article td) {
+	:global(.docs-article th),
+	:global(.docs-article td) {
 		border-bottom: 1px solid #dfe5dc;
 		padding: 10px 12px;
 		text-align: left;
 		vertical-align: top;
 	}
 
-	:global(article th) {
+	:global(.docs-article th) {
 		color: #10120f;
 		font-weight: 700;
 	}
 
-	:global(article td:last-child),
-	:global(article th:last-child) {
+	:global(.docs-article td:last-child),
+	:global(.docs-article th:last-child) {
 		text-align: right;
 	}
 

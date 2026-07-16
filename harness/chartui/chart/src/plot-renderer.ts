@@ -1,267 +1,240 @@
-import type { ChartCell, ChartDatum, ChartViewModel, HeatmapMode } from "./chart-contract";
-
-type PlotModule = typeof import("@observablehq/plot");
-type PlotOptions = Parameters<PlotModule["plot"]>[0];
-type RectYOptions = NonNullable<Parameters<PlotModule["rectY"]>[1]>;
-type HeatmapBin = Record<string, unknown> & {
-  __x: number;
-  __y: number;
-  count: number;
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
-};
+import { BarChart, BoxplotChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
+import { DataZoomComponent, GridComponent, LegendComponent, TooltipComponent, VisualMapComponent } from "echarts/components";
+import { init, use } from "echarts/core";
+import type { EChartsType } from "echarts/core";
+import type { EChartsOption, SeriesOption } from "echarts";
+import { SVGRenderer } from "echarts/renderers";
+import type { ChartCell, ChartDatum, ChartViewModel } from "./chart-contract";
 
 const SERIES_COLORS = ["#2274A5", "#78C091", "#87B3D4", "#131B23", "#816C61"];
 const HEAT_COLORS = ["#edf6f9", "#87B3D4", "#2274A5", "#131B23"];
+const instances = new WeakMap<HTMLElement, EChartsType>();
 
-export function createPlotRenderer(Plot: PlotModule) {
+use([
+  BarChart,
+  BoxplotChart,
+  HeatmapChart,
+  LineChart,
+  ScatterChart,
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  VisualMapComponent,
+  SVGRenderer,
+]);
+
+export function createPlotRenderer() {
   return {
     render(target: HTMLElement, chart: ChartViewModel) {
-      target.replaceChildren(
-        chart.chart_kind === "table" ? renderTable(chart) : renderPlot(Plot, target, chart),
-      );
+      instances.get(target)?.dispose();
+      if (chart.chart_kind === "table") {
+        target.replaceChildren(renderTable(chart));
+        return;
+      }
+
+      const root = document.createElement("div");
+      root.className = "chartui-echart";
+      root.style.width = `${chartWidth(target, chart)}px`;
+      root.style.height = `${chartHeight(target, chart)}px`;
+      target.replaceChildren(root);
+
+      const instance = init(root, null, { renderer: "svg" });
+      instances.set(target, instance);
+      instance.setOption(optionFor(chart), true);
+      requestAnimationFrame(() => instance.resize());
     },
   };
 }
 
-function renderPlot(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
-  if (chart.chart_kind === "heatmap") return renderHeatmap(Plot, target, chart);
-  if (chart.chart_kind === "scatter" || chart.chart_kind === "bubble") return renderScatter(Plot, target, chart);
-  if (chart.chart_kind === "histogram") return renderHistogram(Plot, target, chart);
-  if (chart.chart_kind === "box") return renderBox(Plot, target, chart);
-
-  const markOptions = {
-    x: chart.dimension,
-    y: chart.value,
-    title: tooltip(chart),
-  };
-
-  const xCount = new Set(chart.data.map((datum) => datum[chart.dimension])).size || 1;
-
-  return Plot.plot({
-    width: Math.max(plotWidth(target), 126 + xCount * 96),
-    height: 260,
-    marginTop: 12,
-    marginRight: 18,
-    marginBottom: 48,
-    marginLeft: 54,
-    x: { label: null },
-    y: { grid: true, label: null },
-    color: chart.series
-      ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS }
-      : undefined,
-    style: plotStyle(),
-    marks:
-      chart.chart_kind === "line"
-        ? [
-            Plot.ruleY([0]),
-            ...(chart.lower && chart.upper
-              ? [
-                  Plot.areaY(chart.data, {
-                    x: chart.dimension,
-                    y1: chart.lower,
-                    y2: chart.upper,
-                    fill: chart.series ?? "#000",
-                    z: chart.series,
-                    opacity: 0.18,
-                  }),
-                ]
-              : []),
-            Plot.lineY(chart.data, {
-              ...markOptions,
-              stroke: chart.series ?? "#000",
-              z: chart.series,
-              marker: true,
-            }),
-          ]
-        : [
-            Plot.ruleY([0]),
-            Plot.barY(chart.data, {
-              ...markOptions,
-              fill: chart.series ?? "#000",
-              z: chart.series,
-              inset: 2,
-            }),
-          ],
-  } satisfies PlotOptions);
+function optionFor(chart: ChartViewModel): EChartsOption {
+  if (chart.chart_kind === "histogram") return histogramOption(chart);
+  if (chart.chart_kind === "scatter" || chart.chart_kind === "bubble") return scatterOption(chart);
+  if (chart.chart_kind === "box") return boxOption(chart);
+  if (chart.chart_kind === "heatmap") return heatmapOption(chart);
+  if (chart.chart_kind === "line") return lineOption(chart);
+  return barOption(chart);
 }
 
-function renderScatter(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
-  return Plot.plot({
-    width: plotWidth(target),
-    height: 260,
-    marginTop: 12,
-    marginRight: 18,
-    marginBottom: 48,
-    marginLeft: 54,
-    x: { grid: true, label: null },
-    y: { grid: true, label: null },
-    r: chart.size ? { range: [3, 16] } : undefined,
-    color: chart.series ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS } : undefined,
-    style: plotStyle(),
-    marks: [
-      Plot.dot(chart.data, {
-        x: chart.dimension,
-        y: chart.value,
-        r: chart.size ?? 4,
-        fill: chart.series ?? SERIES_COLORS[0],
-        stroke: "#fff",
-        strokeWidth: 0.8,
-        fillOpacity: 0.72,
-        title: tooltip(chart),
-      }),
-    ],
-  } satisfies PlotOptions);
+function barOption(chart: ChartViewModel): EChartsOption {
+  const categories = unique(chart.data.map((datum) => datum[chart.dimension]));
+  const names = chart.series ? unique(chart.data.map((datum) => datum[chart.series as string])) : ["Value"];
+  return baseCartesian(chart, {
+    xAxis: categoryAxis(categories),
+    yAxis: valueAxis(),
+    series: names.map((name) => ({
+      name: String(name),
+      type: "bar",
+      stack: chart.series ? "total" : undefined,
+      emphasis: { focus: "series" },
+      data: categories.map((category) => sumValue(chart, category, name)),
+    })),
+  });
 }
 
-function renderHistogram(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
-  return Plot.plot({
-    width: plotWidth(target),
-    height: 260,
-    marginTop: 12,
-    marginRight: 18,
-    marginBottom: 48,
-    marginLeft: 54,
-    x: { grid: true, label: null },
-    y: { grid: true, label: null },
-    color: chart.series ? { label: displayLabel(chart.series), legend: true, range: SERIES_COLORS } : undefined,
-    style: plotStyle(),
-    marks: [
-      Plot.ruleY([0]),
-      Plot.rectY(
-        chart.data,
-        Plot.binX<RectYOptions>({ y: "count" }, { x: chart.value, fill: chart.series ?? SERIES_COLORS[0], inset: 1 }),
-      ),
-    ],
-  } satisfies PlotOptions);
+function lineOption(chart: ChartViewModel): EChartsOption {
+  const categories = unique(chart.data.map((datum) => datum[chart.dimension]));
+  const names = chart.series ? unique(chart.data.map((datum) => datum[chart.series as string])) : ["Value"];
+  return baseCartesian(chart, {
+    xAxis: categoryAxis(categories),
+    yAxis: valueAxis(),
+    series: names.map((name) => ({
+      name: String(name),
+      type: "line",
+      symbolSize: 7,
+      data: categories.map((category) => sumValue(chart, category, name)),
+    })),
+  });
 }
 
-function renderBox(Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement | SVGSVGElement {
-  const grouped = chart.series != null;
-  return Plot.plot({
-    width: Math.max(plotWidth(target), 420),
-    height: 260,
-    marginTop: 42,
-    marginRight: 18,
-    marginBottom: 48,
-    marginLeft: 54,
-    x: { label: null },
-    y: { grid: true, label: null },
-    fx: grouped ? { label: null } : undefined,
-    color: grouped ? { label: displayLabel(chart.series as string), legend: true, range: SERIES_COLORS } : undefined,
-    style: plotStyle(),
-    marks: [
-      Plot.ruleY([0]),
-      Plot.boxY(chart.data, {
-        x: grouped ? chart.series : chart.dimension,
-        fx: grouped ? chart.dimension : undefined,
-        y: chart.value,
-        fill: grouped ? chart.series : SERIES_COLORS[0],
-        stroke: grouped ? chart.series : SERIES_COLORS[0],
-        fillOpacity: 0.38,
-      }),
-    ],
-  } satisfies PlotOptions);
-}
-
-function renderHeatmap(_Plot: PlotModule, target: HTMLElement, chart: ChartViewModel): HTMLElement {
-  return resolveHeatmapMode(chart) === "continuous"
-    ? renderContinuousHeatmap(target, chart)
-    : renderCategoricalHeatmap(chart);
-}
-
-function renderCategoricalHeatmap(chart: ChartViewModel): HTMLElement {
-  const xValues = unique(chart.data.map((datum) => datum[chart.dimension]));
-  const yValues = unique(chart.data.map((datum) => datum[chart.series ?? ""]));
+function histogramOption(chart: ChartViewModel): EChartsOption {
   const values = chart.data.map((datum) => finiteNumber(datum[chart.value])).filter((value) => value != null);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, min + 1);
-  const byCell = new Map<string, ChartDatum>();
-  const root = document.createElement("section");
-  const grid = document.createElement("div");
-  const cellSize = xValues.length * yValues.length > 80 ? 22 : 34;
-
-  root.className = "chartui-heatmap";
-  grid.className = "chartui-heatmap-grid";
-  grid.style.setProperty("--cell", `${cellSize}px`);
-  grid.style.gridTemplateColumns = `minmax(84px, max-content) repeat(${xValues.length}, var(--cell))`;
-
-  for (const datum of chart.data) {
-    byCell.set(`${String(datum[chart.dimension])}\u0000${String(datum[chart.series ?? ""])}`, datum);
-  }
-
-  grid.appendChild(labelCell(""));
-  xValues.forEach((value, index) => grid.appendChild(labelCell(String(index + 1), String(value))));
-
-  for (const y of yValues) {
-    grid.appendChild(labelCell(String(y), String(y), "chartui-y-label"));
-    for (const x of xValues) {
-      const datum = byCell.get(`${String(x)}\u0000${String(y)}`);
-      grid.appendChild(datum ? heatCell(categoricalTooltip(chart, datum), datum[chart.value], min, max) : emptyCell());
-    }
-  }
-
-  root.append(legend(min, max, chart.value), grid);
-  attachHeatmapTooltip(root);
-  return root;
+  const bins = histogramBins(values);
+  return baseCartesian(chart, {
+    xAxis: categoryAxis(bins.map((bin) => `${formatNumber(bin.start)}-${formatNumber(bin.end)}`)),
+    yAxis: valueAxis(),
+    series: [
+      {
+        name: displayLabel(chart.value),
+        type: "bar",
+        data: bins.map((bin) => bin.count),
+      },
+    ],
+  });
 }
 
-function renderContinuousHeatmap(target: HTMLElement, chart: ChartViewModel): HTMLElement {
-  const width = plotWidth(target);
-  const columns = Math.max(24, Math.min(42, Math.floor((width - 88) / 18)));
-  const rows = Math.max(16, Math.min(38, Math.round(columns * 0.72)));
-  const cell = Math.max(14, Math.min(20, Math.floor((width - 96) / columns)));
-  const data = squareHeatmapData(chart, columns, rows);
-  const max = Math.max(...data.map((datum) => Number(datum.count)), 1);
-  const root = document.createElement("section");
-  const grid = document.createElement("div");
-
-  root.className = "chartui-heatmap";
-  grid.className = "chartui-heatmap-grid chartui-heatmap-grid-continuous";
-  grid.style.setProperty("--cell", `${cell}px`);
-  grid.style.gridTemplateColumns = `repeat(${columns}, var(--cell))`;
-  grid.style.width = `${columns * cell}px`;
-
-  const byCell = new Map(data.map((datum) => [`${datum.__x}:${datum.__y}`, datum]));
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
-      const datum = byCell.get(`${x}:${y}`);
-      const node = datum ? heatCell(continuousTooltip(chart, datum), datum.count, 0, max) : emptyCell();
-      grid.appendChild(node);
-    }
-  }
-
-  root.append(legend(0, max, chart.value), grid);
-  attachHeatmapTooltip(root);
-  return root;
+function scatterOption(chart: ChartViewModel): EChartsOption {
+  const names = chart.series ? unique(chart.data.map((datum) => datum[chart.series as string])) : ["Value"];
+  return baseCartesian(chart, {
+    xAxis: valueAxis(),
+    yAxis: valueAxis(),
+    series: names.map((name) => ({
+      name: String(name),
+      type: "scatter",
+      symbolSize: chart.chart_kind === "bubble" ? (value: unknown[]) => Math.max(6, Number(value[2]) * 4) : 8,
+      data: chart.data
+        .filter((datum) => !chart.series || datum[chart.series] === name)
+        .map((datum) => [
+          finiteNumber(datum[chart.dimension]) ?? 0,
+          finiteNumber(datum[chart.value]) ?? 0,
+          chart.size ? finiteNumber(datum[chart.size]) ?? 1 : 1,
+        ]),
+    })),
+  });
 }
 
-function resolveHeatmapMode(chart: ChartViewModel): Exclude<HeatmapMode, "auto" | "calendar"> {
-  if (chart.heatmap_mode === "continuous") return "continuous";
-  if (chart.heatmap_mode === "categorical" || chart.heatmap_mode === "calendar") return "categorical";
-  return chart.series && hasContinuousAxis(chart.data, chart.dimension) && hasContinuousAxis(chart.data, chart.series)
-    ? "continuous"
-    : "categorical";
+function boxOption(chart: ChartViewModel): EChartsOption {
+  const categories = unique(chart.data.map((datum) => datum[chart.dimension]));
+  const names = chart.series ? unique(chart.data.map((datum) => datum[chart.series as string])) : ["Value"];
+  return baseCartesian(chart, {
+    xAxis: categoryAxis(categories),
+    yAxis: valueAxis(),
+    series: names.map((name) => ({
+      name: String(name),
+      type: "boxplot",
+      data: categories.map((category) => {
+        const values = chart.data
+          .filter((datum) => datum[chart.dimension] === category && (!chart.series || datum[chart.series] === name))
+          .map((datum) => finiteNumber(datum[chart.value]))
+          .filter((value) => value != null)
+          .sort((left, right) => left - right);
+        return values.length ? [values[0], quantile(values, 0.25), quantile(values, 0.5), quantile(values, 0.75), values[values.length - 1]] : [];
+      }),
+    })) as SeriesOption[],
+  });
 }
 
-function hasContinuousAxis(data: ChartDatum[], column: string): boolean {
-  const values = data.filter((datum) => datum[column] != null);
-  return values.length > 0 && values.every((datum) => continuousValue(datum[column]) != null);
+function heatmapOption(chart: ChartViewModel): EChartsOption {
+  const continuous = chart.heatmap_mode === "continuous" || (!chart.heatmap_mode && chart.series && hasContinuousAxis(chart.data, chart.dimension) && hasContinuousAxis(chart.data, chart.series));
+  const data = continuous ? continuousHeatmapData(chart) : categoricalHeatmapData(chart);
+  const max = Math.max(...data.values.map((item) => Number(item[2])), 1);
+
+  return {
+    ...baseOption(chart),
+    grid: { top: 50, left: 82, right: 26, bottom: 50, containLabel: false },
+    xAxis: { type: "category", data: data.x, splitArea: { show: true }, axisLabel: { color: "#000", fontSize: 11 } },
+    yAxis: { type: "category", data: data.y, splitArea: { show: true }, axisLabel: { color: "#000", fontSize: 11 } },
+    visualMap: {
+      min: 0,
+      max,
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      top: 0,
+      inRange: { color: HEAT_COLORS },
+      textStyle: { color: "#000", fontSize: 11 },
+    },
+    series: [{ name: displayLabel(chart.value), type: "heatmap", data: data.values, emphasis: { itemStyle: { borderColor: "#131B23", borderWidth: 1 } } }],
+  };
 }
 
-function squareHeatmapData(chart: ChartViewModel, columns: number, rows: number): HeatmapBin[] {
+function baseCartesian(chart: ChartViewModel, option: Pick<EChartsOption, "xAxis" | "yAxis" | "series">): EChartsOption {
+  return {
+    ...baseOption(chart),
+    grid: { top: chart.series ? 42 : 18, left: 42, right: 18, bottom: 44, containLabel: true },
+    dataZoom: [{ type: "inside", xAxisIndex: 0, filterMode: "none" }],
+    ...option,
+  };
+}
+
+function baseOption(chart: ChartViewModel): EChartsOption {
+  return {
+    backgroundColor: "#edf6f9",
+    color: SERIES_COLORS,
+    textStyle: { color: "#000", fontFamily: "inherit" },
+    tooltip: {
+      trigger: chart.chart_kind === "line" ? "axis" : "item",
+      confine: true,
+      backgroundColor: "#131B23",
+      borderWidth: 0,
+      textStyle: { color: "#fff", fontSize: 11 },
+    },
+    legend: chart.series ? { type: "scroll", top: 0, textStyle: { color: "#000", fontSize: 11 } } : undefined,
+  };
+}
+
+function categoryAxis(values: ChartCell[]) {
+  return {
+    type: "category" as const,
+    data: values.map(String),
+    axisLabel: { color: "#000", fontSize: 11, hideOverlap: true },
+    axisLine: { lineStyle: { color: "#000" } },
+  };
+}
+
+function valueAxis() {
+  return {
+    type: "value" as const,
+    splitLine: { lineStyle: { color: "rgb(0 0 0 / 12%)" } },
+    axisLabel: { color: "#000", fontSize: 11 },
+  };
+}
+
+function categoricalHeatmapData(chart: ChartViewModel) {
+  const x = unique(chart.data.map((datum) => datum[chart.dimension]));
+  const y = unique(chart.data.map((datum) => datum[chart.series ?? ""]));
+  return {
+    x: x.map(String),
+    y: y.map(String),
+    values: chart.data.map((datum) => [
+      x.findIndex((value) => value === datum[chart.dimension]),
+      y.findIndex((value) => value === datum[chart.series ?? ""]),
+      finiteNumber(datum[chart.value]) ?? 0,
+    ]),
+  };
+}
+
+function continuousHeatmapData(chart: ChartViewModel) {
   const points = chart.data
     .map((datum) => ({
-      x: continuousValue(datum[chart.dimension]),
-      y: continuousValue(datum[chart.series ?? ""]),
+      x: finiteNumber(datum[chart.dimension]),
+      y: chart.series ? finiteNumber(datum[chart.series]) : null,
     }))
-    .filter((point): point is { x: number | Date; y: number | Date } => point.x != null && point.y != null);
-  if (!points.length) return [];
-
-  const xs = points.map((point) => Number(point.x));
-  const ys = points.map((point) => Number(point.y));
+    .filter((point): point is { x: number; y: number } => point.x != null && point.y != null);
+  const columns = 32;
+  const rows = 22;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
@@ -269,165 +242,83 @@ function squareHeatmapData(chart: ChartViewModel, columns: number, rows: number)
   const counts = new Map<string, number>();
 
   for (const point of points) {
-    const x = clamp(Math.floor(((Number(point.x) - minX) / (maxX - minX || 1)) * columns), 0, columns - 1);
-    const y = clamp(Math.floor(((Number(point.y) - minY) / (maxY - minY || 1)) * rows), 0, rows - 1);
+    const x = clamp(Math.floor(((point.x - minX) / (maxX - minX || 1)) * columns), 0, columns - 1);
+    const y = clamp(Math.floor(((point.y - minY) / (maxY - minY || 1)) * rows), 0, rows - 1);
     const key = `${x}:${rows - y - 1}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
-  return Array.from(counts, ([key, count]) => {
-    const [x, y] = key.split(":").map(Number);
+  return {
+    x: Array.from({ length: columns }, (_, index) => formatNumber(minX + (index / columns) * (maxX - minX || 1))),
+    y: Array.from({ length: rows }, (_, index) => formatNumber(minY + ((rows - index - 1) / rows) * (maxY - minY || 1))),
+    values: Array.from(counts, ([key, count]) => {
+      const [x, y] = key.split(":").map(Number);
+      return [x, y, count];
+    }),
+  };
+}
+
+function histogramBins(values: number[]) {
+  if (!values.length) return [];
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const count = clamp(Math.ceil(Math.sqrt(values.length)), 6, 18);
+  const step = (max - min || 1) / count;
+  return Array.from({ length: count }, (_, index) => {
+    const start = min + index * step;
+    const end = index === count - 1 ? max : start + step;
     return {
-      __x: x,
-      __y: y,
-      count,
-      x0: minX + (x / columns) * (maxX - minX || 1),
-      x1: minX + ((x + 1) / columns) * (maxX - minX || 1),
-      y0: minY + ((rows - y - 1) / rows) * (maxY - minY || 1),
-      y1: minY + ((rows - y) / rows) * (maxY - minY || 1),
+      start,
+      end,
+      count: values.filter((value) => value >= start && (index === count - 1 ? value <= end : value < end)).length,
     };
   });
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
+function sumValue(chart: ChartViewModel, category: ChartCell, segment: ChartCell): number {
+  return chart.data
+    .filter((datum) => datum[chart.dimension] === category && (!chart.series || datum[chart.series] === segment))
+    .reduce((sum, datum) => sum + (finiteNumber(datum[chart.value]) ?? 0), 0);
 }
 
-function continuousValue(value: unknown): number | Date | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return null;
-
-  const number = Number(value);
-  if (Number.isFinite(number)) return number;
-
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? new Date(timestamp) : null;
+function hasContinuousAxis(data: ChartDatum[], column: string): boolean {
+  const values = data.map((datum) => finiteNumber(datum[column])).filter((value) => value != null);
+  return values.length > 0;
 }
 
-function tooltip(chart: ChartViewModel): (datum: Record<string, unknown>) => string {
-  return (datum) =>
-    chart.columns.map((column) => `${displayLabel(column)}: ${String(datum[column] ?? "")}`).join("\n");
+function chartWidth(target: HTMLElement, chart: ChartViewModel): number {
+  if (chart.chart_kind === "histogram") {
+    const values = chart.data.map((datum) => finiteNumber(datum[chart.value])).filter((value) => value != null);
+    return Math.max(target.clientWidth || 560, 520, histogramBins(values).length * 72);
+  }
+
+  const categoryCount = unique(chart.data.map((datum) => datum[chart.dimension])).length || 1;
+  if (chart.chart_kind === "heatmap") {
+    const shape = heatmapShape(chart);
+    return Math.max(target.clientWidth || 560, 520, shape.x * heatmapCellSize(target, shape.x) + 108);
+  }
+  if (chart.chart_kind === "bar") return Math.max(target.clientWidth || 560, 420, categoryCount * 82);
+  return Math.max(target.clientWidth || 560, 420);
 }
 
-function heatCell(tooltipText: string, rawValue: unknown, min: number, max: number): HTMLDivElement {
-  const cell = document.createElement("div");
-  const value = finiteNumber(rawValue) ?? 0;
-  cell.className = "chartui-heat-cell";
-  cell.style.backgroundColor = heatColor((value - min) / (max - min || 1));
-  cell.dataset.tooltip = tooltipText;
-  return cell;
+function chartHeight(target: HTMLElement, chart: ChartViewModel): number {
+  if (chart.chart_kind !== "heatmap") return 300;
+  const shape = heatmapShape(chart);
+  return Math.max(260, shape.y * heatmapCellSize(target, shape.x) + 100);
 }
 
-function emptyCell(): HTMLDivElement {
-  const cell = document.createElement("div");
-  cell.className = "chartui-heat-cell chartui-heat-cell-empty";
-  return cell;
-}
-
-function labelCell(text: string, title = text, className = "chartui-heat-label"): HTMLDivElement {
-  const cell = document.createElement("div");
-  cell.className = className;
-  cell.textContent = text;
-  cell.title = title;
-  return cell;
-}
-
-function legend(min: number, max: number, column: string): HTMLDivElement {
-  const node = document.createElement("div");
-  node.className = "chartui-heat-legend";
-  node.innerHTML = `<span>${displayLabel(column)}</span><i></i><small>${formatNumber(min)}</small><small>${formatNumber(max)}</small>`;
-  return node;
-}
-
-function attachHeatmapTooltip(root: HTMLElement): void {
-  const tooltip = document.createElement("div");
-  tooltip.className = "chartui-heat-tooltip";
-  root.appendChild(tooltip);
-
-  root.addEventListener("pointermove", (event) => {
-    const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>("[data-tooltip]") : null;
-    if (!target?.dataset.tooltip) {
-      tooltip.removeAttribute("data-visible");
-      return;
-    }
-    const rect = root.getBoundingClientRect();
-    tooltip.textContent = target.dataset.tooltip;
-    tooltip.style.left = `${event.clientX - rect.left + 12}px`;
-    tooltip.style.top = `${event.clientY - rect.top + 12}px`;
-    tooltip.dataset.visible = "true";
-  });
-
-  root.addEventListener("pointerleave", () => tooltip.removeAttribute("data-visible"));
-}
-
-function categoricalTooltip(chart: ChartViewModel, datum: ChartDatum): string {
-  return [
-    `${displayLabel(chart.dimension)}: ${String(datum[chart.dimension] ?? "")}`,
-    chart.series ? `${displayLabel(chart.series)}: ${String(datum[chart.series] ?? "")}` : "",
-    `${displayLabel(chart.value)}: ${formatNumber(finiteNumber(datum[chart.value]) ?? 0)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function continuousTooltip(chart: ChartViewModel, datum: HeatmapBin): string {
-  return [
-    `${displayLabel(chart.dimension)}: ${formatNumber(datum.x0)}-${formatNumber(datum.x1)}`,
-    chart.series ? `${displayLabel(chart.series)}: ${formatNumber(datum.y0)}-${formatNumber(datum.y1)}` : "",
-    `Count: ${formatNumber(datum.count)}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-function unique(values: unknown[]): ChartCell[] {
-  const seen = new Set<string>();
-  return values.filter((value): value is ChartCell => {
-    const key = String(value);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-  });
-}
-
-function finiteNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function heatColor(value: number): string {
-  const ratio = clamp(value, 0, 1);
-  const index = Math.min(HEAT_COLORS.length - 2, Math.floor(ratio * (HEAT_COLORS.length - 1)));
-  const local = ratio * (HEAT_COLORS.length - 1) - index;
-  return mixHex(HEAT_COLORS[index], HEAT_COLORS[index + 1], local);
-}
-
-function mixHex(left: string, right: string, ratio: number): string {
-  const a = parseInt(left.slice(1), 16);
-  const b = parseInt(right.slice(1), 16);
-  const channel = (shift: number) =>
-    Math.round(((a >> shift) & 255) * (1 - ratio) + ((b >> shift) & 255) * ratio);
-  return `rgb(${channel(16)} ${channel(8)} ${channel(0)})`;
-}
-
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
-}
-
-function displayLabel(column: string): string {
-  return column.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function plotStyle() {
+function heatmapShape(chart: ChartViewModel): { x: number; y: number } {
+  if (chart.heatmap_mode === "continuous" || (!chart.heatmap_mode && chart.series && hasContinuousAxis(chart.data, chart.dimension) && hasContinuousAxis(chart.data, chart.series))) {
+    return { x: 32, y: 22 };
+  }
   return {
-    background: "#edf6f9",
-    color: "#000",
-    fontFamily: "inherit",
-    fontSize: "12px",
+    x: unique(chart.data.map((datum) => datum[chart.dimension])).length || 1,
+    y: unique(chart.data.map((datum) => datum[chart.series ?? ""])).length || 1,
   };
 }
 
-function plotWidth(target: HTMLElement): number {
-  return Math.max(target.clientWidth || 560, 320);
+function heatmapCellSize(target: HTMLElement, xCount: number): number {
+  return clamp(Math.floor(((target.clientWidth || 560) - 108) / Math.max(xCount, 1)), 16, 30);
 }
 
 function renderTable(chart: ChartViewModel): HTMLTableElement {
@@ -446,4 +337,37 @@ function renderTable(chart: ChartViewModel): HTMLTableElement {
     });
   });
   return table;
+}
+
+function unique(values: unknown[]): ChartCell[] {
+  const seen = new Set<string>();
+  return values.filter((value): value is ChartCell => {
+    const key = String(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  });
+}
+
+function finiteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function quantile(values: number[], q: number): number {
+  const index = (values.length - 1) * q;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  return values[lower] + (values[upper] - values[lower]) * (index - lower);
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+}
+
+function displayLabel(column: string): string {
+  return column.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

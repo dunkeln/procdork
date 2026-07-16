@@ -1,6 +1,5 @@
 <script lang="ts">
   import { App as McpApp, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
-  import * as Plot from "@observablehq/plot";
   import { onDestroy, onMount } from "svelte";
   import { normalizeChartPayload } from "./chart-contract";
   import type { ChartViewModel } from "./chart-contract";
@@ -15,9 +14,9 @@
   let chartWidth = 0;
   let observedEl: HTMLDivElement | undefined;
   let resizeObserver: ResizeObserver | undefined;
-  const renderer = createPlotRenderer(Plot);
+  const renderer = createPlotRenderer();
 
-  $: yAxisLabel = chart && chart.chart_kind !== "heatmap" ? displayLabel(chart.value) : "";
+  $: yAxisLabel = chart && chart.chart_kind !== "heatmap" ? (chart.chart_kind === "histogram" ? "Count" : displayLabel(chart.value)) : "";
   $: xAxisLabel = chart && chart.chart_kind !== "heatmap" ? displayLabel(chart.dimension) : "";
   $: if (chartEl && chartEl !== observedEl) {
     resizeObserver?.disconnect();
@@ -323,9 +322,10 @@
   }
 
   .axis-x {
-    margin: -8px 18px 10px 36px;
+    margin: 8px 18px 12px 36px;
     text-align: center;
     font-size: 12px;
+    line-height: 1.3;
     color: rgb(0 0 0 / 62%);
   }
 
@@ -346,7 +346,8 @@
   }
 
   .chart-host :global(svg),
-  .chart-host :global(figure) {
+  .chart-host :global(figure),
+  .chart-host :global(.chartui-echart) {
     display: block;
     margin: 0 auto;
   }
@@ -357,93 +358,6 @@
     font-size: 12px;
   }
 
-  .chart-host :global(.chartui-heatmap) {
-    position: relative;
-    display: grid;
-    justify-content: center;
-    gap: 14px;
-    min-width: max-content;
-    padding: 4px 10px 2px;
-  }
-
-  .chart-host :global(.chartui-heat-legend) {
-    display: grid;
-    grid-template-columns: auto 160px auto auto;
-    align-items: center;
-    justify-content: start;
-    gap: 8px;
-    font-size: 11px;
-    color: rgb(0 0 0 / 62%);
-  }
-
-  .chart-host :global(.chartui-heat-legend i) {
-    height: 10px;
-    background: linear-gradient(90deg, #edf6f9, #87b3d4, #2274a5, #131b23);
-  }
-
-  .chart-host :global(.chartui-heatmap-grid) {
-    display: grid;
-    gap: 4px;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .chart-host :global(.chartui-heatmap-grid-continuous) {
-    gap: 3px;
-  }
-
-  .chart-host :global(.chartui-heat-cell) {
-    width: var(--cell);
-    height: var(--cell);
-    box-sizing: border-box;
-  }
-
-  .chart-host :global(.chartui-heat-cell[data-tooltip]) {
-    cursor: default;
-  }
-
-  .chart-host :global(.chartui-heat-tooltip) {
-    position: absolute;
-    z-index: 2;
-    display: none;
-    max-width: 260px;
-    padding: 7px 9px;
-    border: 1px solid rgb(255 255 255 / 16%);
-    border-radius: 6px;
-    background: #131b23;
-    box-shadow: 0 8px 22px rgb(0 0 0 / 18%);
-    color: #fff;
-    font-size: 11px;
-    line-height: 1.45;
-    pointer-events: none;
-    white-space: pre-line;
-  }
-
-  .chart-host :global(.chartui-heat-tooltip[data-visible]) {
-    display: block;
-  }
-
-  .chart-host :global(.chartui-heat-cell-empty) {
-    background: transparent;
-  }
-
-  .chart-host :global(.chartui-heat-label),
-  .chart-host :global(.chartui-y-label) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    color: rgb(0 0 0 / 58%);
-  }
-
-  .chart-host :global(.chartui-heat-label) {
-    text-align: center;
-  }
-
-  .chart-host :global(.chartui-y-label) {
-    max-width: 144px;
-    text-align: right;
-  }
 
   .chart-host :global(th),
   .chart-host :global(td) {
@@ -467,7 +381,7 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px 14px;
-    margin: 10px auto 0;
+    margin: 0 auto;
     max-width: 760px;
   }
 

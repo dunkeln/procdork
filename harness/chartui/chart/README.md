@@ -17,7 +17,7 @@ Contract:
 - Python returns `structuredContent` with `title`, `chart_kind`, `columns`,
   `rows`, `facts`, `key_facts`, and `truncated`.
 - ChartUI normalizes that payload in `src/chart-contract.ts`.
-- Observable Plot renders the normalized view model in `src/plot-renderer.ts`.
+- ECharts renders the normalized view model in `src/plot-renderer.ts`.
 - The text result remains the fallback for clients that do not show the app.
 
 Commands:
